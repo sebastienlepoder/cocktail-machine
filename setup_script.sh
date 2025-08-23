@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# CocktailMachine Complete Setup (Raspberry Pi OS Bookworm / Pi 5)
+#  Working version: 2025-08-22 v1.0 
+#  CocktailMachine Complete Setup (Raspberry Pi OS Bookworm / Pi 5)
 # - Installs Realtek 88x2bu driver (Archer T3U Nano, 2357:012e)
 # - Creates standalone AP on wlan1 (no NAT/Internet)
 #   SSID: CocktailMachine   PASS: Cocktail2024!
