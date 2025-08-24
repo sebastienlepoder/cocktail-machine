@@ -1,0 +1,367 @@
+import React, { useState, useEffect } from 'react';
+
+const CocktailApp = () => {
+  const [currentPage, setCurrentPage] = useState('home');
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [selectedCocktail, setSelectedCocktail] = useState(null);
+  const [isMixing, setIsMixing] = useState(false);
+  const [mixStatus, setMixStatus] = useState('');
+
+  // Cocktail data
+  const cocktails = {
+    'margarita': {
+      id: 'margarita',
+      name: 'Margarita',
+      emoji: '🍹',
+      color: 'from-green-400 to-green-300',
+      preview: 'Classic tequila cocktail with lime and triple sec',
+      description: 'A classic Mexican cocktail made with tequila, triple sec, and fresh lime juice. Served with a salted rim for the perfect balance of sweet, sour, and salty flavors. Perfect for any celebration!',
+      ingredients: ['Tequila 60ml', 'Triple Sec 30ml', 'Lime Juice 30ml', 'Salt rim'],
+      time: '2 minutes'
+    },
+    'old-fashioned': {
+      id: 'old-fashioned',
+      name: 'Old Fashioned',
+      emoji: '🥃',
+      color: 'from-amber-600 to-amber-500',
+      preview: 'Whiskey cocktail with sugar and bitters',
+      description: 'The grandfather of cocktails! Made with whiskey, sugar, bitters, and a twist of citrus peel. This timeless drink has been enjoyed since the 1880s and represents the essence of classic cocktail craftsmanship.',
+      ingredients: ['Whiskey 60ml', 'Sugar syrup 5ml', 'Bitters 2 dashes', 'Orange peel'],
+      time: '3 minutes'
+    },
+    'mojito': {
+      id: 'mojito',
+      name: 'Mojito',
+      emoji: '🌿',
+      color: 'from-green-500 to-green-400',
+      preview: 'Refreshing rum cocktail with mint and lime',
+      description: 'A refreshing Cuban highball made with white rum, fresh mint leaves, lime juice, sugar, and soda water. The perfect summer drink that combines tropical flavors with a cooling mint finish.',
+      ingredients: ['White Rum 60ml', 'Mint leaves 10', 'Lime juice 30ml', 'Sugar syrup 15ml', 'Soda water 100ml'],
+      time: '2 minutes'
+    },
+    'whiskey-sour': {
+      id: 'whiskey-sour',
+      name: 'Whiskey Sour',
+      emoji: '🍋',
+      color: 'from-yellow-500 to-yellow-400',
+      preview: 'Whiskey with lemon juice and simple syrup',
+      description: 'A perfectly balanced cocktail combining whiskey with fresh lemon juice and simple syrup. Often topped with a cherry and orange slice, this drink offers the ideal harmony of strong and sour flavors.',
+      ingredients: ['Whiskey 60ml', 'Lemon juice 30ml', 'Sugar syrup 15ml', 'Cherry garnish'],
+      time: '2 minutes'
+    },
+    'cosmopolitan': {
+      id: 'cosmopolitan',
+      name: 'Cosmopolitan',
+      emoji: '🍸',
+      color: 'from-pink-500 to-pink-400',
+      preview: 'Vodka cocktail with cranberry and lime',
+      description: 'Made famous in the 90s, this sophisticated cocktail combines vodka, triple sec, cranberry juice, and lime juice. Elegant, pink, and perfectly balanced - it\'s glamour in a glass!',
+      ingredients: ['Vodka 45ml', 'Triple Sec 15ml', 'Cranberry juice 30ml', 'Lime juice 15ml'],
+      time: '2 minutes'
+    },
+    'daiquiri': {
+      id: 'daiquiri',
+      name: 'Daiquiri',
+      emoji: '🍹',
+      color: 'from-yellow-300 to-yellow-200',
+      preview: 'Simple rum cocktail with lime and sugar',
+      description: 'A simple yet perfect Cuban cocktail with just three ingredients: white rum, fresh lime juice, and simple syrup. Sometimes the best things in life are the simplest - this drink proves that point beautifully.',
+      ingredients: ['White Rum 60ml', 'Lime juice 25ml', 'Sugar syrup 15ml'],
+      time: '90 seconds'
+    }
+  };
+
+  const cocktailArray = Object.values(cocktails);
+  const slideWidth = 280;
+  const maxSlides = Math.max(0, cocktailArray.length - Math.floor(window.innerWidth / slideWidth));
+
+  // Navigation functions
+  const slideLeft = () => {
+    setCurrentSlide(prev => Math.max(0, prev - 1));
+  };
+
+  const slideRight = () => {
+    setCurrentSlide(prev => Math.min(maxSlides, prev + 1));
+  };
+
+  // Page navigation
+  const navigateTo = (page) => {
+    setCurrentPage(page);
+  };
+
+  // Cocktail selection
+  const selectCocktail = (cocktail) => {
+    setSelectedCocktail(cocktail);
+    setCurrentPage('detail');
+  };
+
+  // Mix cocktail function
+  const mixCocktail = async () => {
+    if (!selectedCocktail) return;
+    
+    setIsMixing(true);
+    setMixStatus(`Starting to mix ${selectedCocktail.name}...`);
+    
+    try {
+      const response = await fetch('/mix-cocktail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          cocktail: selectedCocktail.id,
+          timestamp: new Date().toISOString()
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMixStatus(`${selectedCocktail.name} is being mixed! Please wait...`);
+        
+        // Simulate mixing time
+        setTimeout(() => {
+          setMixStatus(`${selectedCocktail.name} is ready! Enjoy!`);
+          setTimeout(() => {
+            setIsMixing(false);
+            setMixStatus('');
+            navigateTo('home');
+          }, 3000);
+        }, parseInt(selectedCocktail.time.replace(/\D/g, '')) * 1000);
+      } else {
+        throw new Error('Mix request failed');
+      }
+    } catch (error) {
+      console.error('Error mixing cocktail:', error);
+      setMixStatus('Error mixing cocktail. Please try again.');
+      setTimeout(() => {
+        setIsMixing(false);
+        setMixStatus('');
+      }, 3000);
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (currentPage === 'home') {
+        if (e.key === 'ArrowLeft') slideLeft();
+        if (e.key === 'ArrowRight') slideRight();
+      } else if (currentPage === 'detail') {
+        if (e.key === 'Escape') navigateTo('home');
+        if (e.key === 'Enter' || e.key === ' ') mixCocktail();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentPage]);
+
+  // Home Page Component
+  const HomePage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white overflow-hidden">
+      {/* Header */}
+      <div className="relative text-center py-8 bg-black bg-opacity-30">
+        <a 
+          href="http://localhost:1880/ui" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="absolute top-6 right-8 bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-30 text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-opacity-20 hover:scale-105 transition-all duration-300 flex items-center gap-2"
+        >
+          ⚙️ Admin Panel
+        </a>
+        <h1 className="text-6xl font-light tracking-widest">COCKTAILS</h1>
+        <p className="mt-2 text-xl opacity-75">Select your perfect drink</p>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center relative px-4">
+        {/* Navigation Buttons */}
+        <button 
+          onClick={slideLeft}
+          disabled={currentSlide === 0}
+          className="absolute left-8 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 text-white p-4 rounded-full text-2xl hover:bg-opacity-20 hover:scale-110 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+        >
+          ‹
+        </button>
+        
+        <button 
+          onClick={slideRight}
+          disabled={currentSlide >= maxSlides}
+          className="absolute right-8 top-1/2 transform -translate-y-1/2 bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 text-white p-4 rounded-full text-2xl hover:bg-opacity-20 hover:scale-110 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed z-10"
+        >
+          ›
+        </button>
+
+        {/* Cocktail Slider */}
+        <div className="overflow-hidden w-full max-w-6xl">
+          <div 
+            className="flex transition-transform duration-500 ease-out gap-6 px-12"
+            style={{ transform: `translateX(-${currentSlide * slideWidth}px)` }}
+          >
+            {cocktailArray.map((cocktail) => (
+              <div
+                key={cocktail.id}
+                onClick={() => selectCocktail(cocktail)}
+                className="min-w-64 h-96 bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 rounded-3xl p-8 cursor-pointer transition-all duration-300 hover:scale-105 hover:bg-opacity-20 hover:shadow-2xl flex flex-col items-center justify-center text-center"
+              >
+                <div className={`w-32 h-32 bg-gradient-to-br ${cocktail.color} rounded-full flex items-center justify-center text-5xl mb-6 shadow-lg`}>
+                  {cocktail.emoji}
+                </div>
+                <h3 className="text-2xl font-bold mb-3 uppercase tracking-wider">{cocktail.name}</h3>
+                <p className="text-sm opacity-75 leading-relaxed">{cocktail.preview}</p>
+                <div className="mt-4 text-xs opacity-60">{cocktail.time}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="text-center py-6 bg-black bg-opacity-20">
+        <div className="flex justify-center gap-2">
+          {Array.from({ length: Math.min(cocktailArray.length, Math.ceil(cocktailArray.length / Math.floor(window.innerWidth / slideWidth))) }).map((_, index) => (
+            <div
+              key={index}
+              className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                index === currentSlide ? 'bg-white' : 'bg-white bg-opacity-30'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Detail Page Component
+  const DetailPage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex items-center justify-center p-8">
+      <div className="bg-white bg-opacity-10 backdrop-blur-lg border border-white border-opacity-20 rounded-3xl p-12 max-w-2xl w-full text-center relative">
+        {/* Close Button */}
+        <button
+          onClick={() => navigateTo('home')}
+          className="absolute top-6 right-8 text-white text-3xl opacity-70 hover:opacity-100 transition-opacity duration-300"
+        >
+          ×
+        </button>
+
+        {/* Cocktail Image */}
+        <div className={`w-40 h-40 bg-gradient-to-br ${selectedCocktail?.color} rounded-full flex items-center justify-center text-7xl mb-8 mx-auto shadow-xl`}>
+          {selectedCocktail?.emoji}
+        </div>
+
+        {/* Cocktail Info */}
+        <h2 className="text-4xl font-bold mb-6 uppercase tracking-wider">{selectedCocktail?.name}</h2>
+        <p className="text-lg leading-relaxed mb-8 opacity-90">{selectedCocktail?.description}</p>
+
+        {/* Ingredients */}
+        <div className="mb-8">
+          <h3 className="text-xl font-semibold mb-4">Ingredients:</h3>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            {selectedCocktail?.ingredients.map((ingredient, index) => (
+              <div key={index} className="bg-white bg-opacity-5 rounded-lg p-2">
+                {ingredient}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Mix Button */}
+        <button
+          onClick={mixCocktail}
+          disabled={isMixing}
+          className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white px-16 py-4 rounded-full text-xl font-bold uppercase tracking-wider hover:from-emerald-600 hover:to-teal-600 hover:scale-105 transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        >
+          {isMixing ? 'MIXING...' : 'MIX'}
+        </button>
+
+        <div className="mt-4 text-sm opacity-75">Preparation time: {selectedCocktail?.time}</div>
+      </div>
+    </div>
+  );
+
+  // Status/Mixing Page Component
+  const StatusPage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex items-center justify-center p-8">
+      <div className="bg-white bg-opacity-10 backdrop-blur-lg border border-white border-opacity-20 rounded-3xl p-12 max-w-lg w-full text-center">
+        <div className="animate-spin w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full mx-auto mb-6"></div>
+        <h2 className="text-2xl font-bold mb-4">Mixing in Progress</h2>
+        <p className="text-lg opacity-90">{mixStatus}</p>
+      </div>
+    </div>
+  );
+
+  // Settings Page Component
+  const SettingsPage = () => (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-bold">Settings</h1>
+          <button
+            onClick={() => navigateTo('home')}
+            className="bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 text-white px-6 py-3 rounded-full hover:bg-opacity-20 transition-all duration-300"
+          >
+            Back to Cocktails
+          </button>
+        </div>
+
+        <div className="grid gap-6">
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 rounded-2xl p-6">
+            <h3 className="text-xl font-semibold mb-4">System Status</h3>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Node-RED Status:</span>
+                <span className="text-green-400">Connected</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Mixer Status:</span>
+                <span className="text-green-400">Ready</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Last Cleaned:</span>
+                <span>Today 09:30</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20 rounded-2xl p-6">
+            <h3 className="text-xl font-semibold mb-4">Quick Actions</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <button className="bg-blue-500 bg-opacity-20 border border-blue-400 border-opacity-30 rounded-lg p-4 hover:bg-opacity-30 transition-all duration-300">
+                Clean System
+              </button>
+              <button className="bg-yellow-500 bg-opacity-20 border border-yellow-400 border-opacity-30 rounded-lg p-4 hover:bg-opacity-30 transition-all duration-300">
+                Test Pumps
+              </button>
+              <button className="bg-purple-500 bg-opacity-20 border border-purple-400 border-opacity-30 rounded-lg p-4 hover:bg-opacity-30 transition-all duration-300">
+                Calibrate
+              </button>
+              <button className="bg-red-500 bg-opacity-20 border border-red-400 border-opacity-30 rounded-lg p-4 hover:bg-opacity-30 transition-all duration-300">
+                Emergency Stop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Main App Router
+  return (
+    <div className="w-full h-screen">
+      {currentPage === 'home' && <HomePage />}
+      {currentPage === 'detail' && <DetailPage />}
+      {currentPage === 'status' && isMixing && <StatusPage />}
+      {currentPage === 'settings' && <SettingsPage />}
+      
+      {/* Status overlay for mixing */}
+      {isMixing && mixStatus && currentPage !== 'status' && (
+        <div className="fixed top-4 right-4 bg-emerald-500 text-white px-6 py-3 rounded-lg shadow-lg z-50">
+          {mixStatus}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CocktailApp;
