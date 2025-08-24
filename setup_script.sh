@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#  Working version: 2025-08-23 v2.2 
+#  Working version: 2025-08-23 v2.3 
 #  CocktailMachine Complete Setup with Enhanced Kiosk Mode (Raspberry Pi OS Bookworm / Pi 5)
 # - Installs Realtek 88x2bu driver (Archer T3U Nano, 2357:012e)
 # - Creates standalone AP on wlan1 (no NAT/Internet)
@@ -434,6 +434,26 @@ module.exports = {
             res.header('Expires', '0');
             next();
         }
+    },
+    uiBuilder: {
+        userTemplatesPath: '/home/pi/.node-red/uibuilder/templates'
+    },
+    // Inject CSS to hide cursor completely
+    ui_template: {
+        css: `
+            * {
+                cursor: none !important;
+            }
+            body, html {
+                cursor: none !important;
+            }
+            button, input, select, textarea, a, div, span {
+                cursor: none !important;
+            }
+            .ui-button, .md-button, .nr-dashboard-button {
+                cursor: none !important;
+            }
+        `
     },
     httpNodeCors: {
         origin: "*",
@@ -1383,6 +1403,7 @@ summary() {
     echo "  Display Mgr: LightDM with auto-login"
     echo "  Stability:   Enhanced monitoring with 60s check interval"
     echo "  Recovery:    Smart restart logic with responsiveness checking"
+    echo "  Cursor:      Completely hidden (including on touch)"
     echo
     echo "Internet:      DISABLED (standalone network)"
     echo "Autostart:     All services enabled for boot"
@@ -1410,6 +1431,7 @@ summary() {
     echo "  Boot theme:  /usr/share/plymouth/themes/cocktail/"
     echo "  Config:      $BOOT_DIR/cmdline.txt and $BOOT_DIR/config.txt"
     echo "  Troubleshoot: /home/pi/troubleshoot-cocktail.sh"
+    echo "  Hide cursor: /home/pi/hide-cursor.sh"
     echo
     echo "Next Steps:"
     echo "1. Replace logo.png with your own image: $LOGO_PATH"
@@ -1424,21 +1446,25 @@ summary() {
     echo "- Manual kiosk test: sudo -u pi /home/pi/cocktail-kiosk.sh"
     echo "- Fix Plymouth theme: sudo plymouth-set-default-theme cocktail && sudo update-initramfs -u"
     echo "- Test Plymouth: sudo plymouthd --debug --no-daemon & sudo plymouth --show-splash"
+    echo "- If cursor still visible: Run the fix_cursor_hiding.sh script"
+    echo "- Manual cursor hide: sudo -u pi /home/pi/hide-cursor.sh"
     echo
     echo "Expected boot sequence after reboot:"
     echo "1. Raspberry Pi rainbow splash (briefly)"
     echo "2. Your logo.png with loading progress"
     echo "3. Desktop loads and opens Node-RED dashboard automatically"
+    echo "4. Cursor is completely hidden for true kiosk experience"
     echo "================================================================="
 }
 
 main() {
-    echo "Starting CocktailMachine complete setup with enhanced kiosk mode v2.2..."
+    echo "Starting CocktailMachine complete setup with enhanced kiosk mode v2.3..."
     echo "✓ Enhanced Plymouth theme configuration for reliable boot splash"
     echo "✓ Improved Node-RED installer with interactive prompt handling"
     echo "✓ Dashboard stability fixes - eliminates white screen flashing"
     echo "✓ Smart browser monitoring with responsiveness checking"
     echo "✓ Enhanced MQTT configuration with proper authentication"
+    echo "✓ Complete cursor hiding system for touch screens"
     echo "✓ Comprehensive troubleshooting and verification"
     echo
     need_root
