@@ -210,8 +210,154 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 # Create openbox config directory
 mkdir -p /home/$USER/.config/openbox
 
+# Create a loading screen HTML file
+print_status "Creating loading screen..."
+mkdir -p /home/$USER/.cocktail-machine
+cat > /home/$USER/.cocktail-machine/loading.html << 'HTML'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cocktail Machine Loading</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .container {
+            text-align: center;
+            animation: fadeIn 1s ease-in;
+        }
+        .logo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            font-weight: 300;
+            letter-spacing: 2px;
+        }
+        .status {
+            font-size: 24px;
+            margin: 20px 0;
+            opacity: 0.9;
+        }
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+            margin: 40px auto;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .dots {
+            display: inline-block;
+            animation: dots 1.5s infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+    <script>
+        // Auto-refresh every 3 seconds to check if service is ready
+        setTimeout(function() {
+            fetch('http://localhost:3000')
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = 'http://localhost:3000';
+                    }
+                })
+                .catch(() => {
+                    setTimeout(() => window.location.reload(), 3000);
+                });
+        }, 3000);
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍹</div>
+        <h1>Cocktail Machine</h1>
+        <div class="loader"></div>
+        <div class="status">Starting services<span class="dots">...</span></div>
+        <p style="margin-top: 20px; opacity: 0.7;">Please wait while the system initializes</p>
+    </div>
+</body>
+</html>
+HTML
+
+# Create service health check script
+print_status "Creating service health check script..."
+cat > /home/$USER/.cocktail-machine/wait-for-service.sh << 'SCRIPT'
+#!/bin/bash
+# Wait for the web dashboard to be ready
+
+echo "Waiting for cocktail machine services to start..."
+
+# Maximum wait time (5 minutes)
+MAX_WAIT=300
+WAITED=0
+
+# First wait a bit for Docker to start
+sleep 10
+
+while [ $WAITED -lt $MAX_WAIT ]; do
+    # Check if the service responds
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\|302"; then
+        echo "Dashboard is ready!"
+        # Start Chromium with the dashboard
+        chromium-browser --kiosk --noerrdialogs --disable-infobars \
+            --check-for-update-interval=604800 \
+            --disable-pinch \
+            --overscroll-history-navigation=0 \
+            --disable-translate \
+            --touch-events=enabled \
+            --enable-touch-drag-drop \
+            --enable-touch-editing \
+            --disable-features=TranslateUI \
+            --disable-session-crashed-bubble \
+            http://localhost:3000 &
+        exit 0
+    fi
+    
+    echo "Service not ready yet. Waiting..."
+    sleep 5
+    WAITED=$((WAITED + 5))
+done
+
+echo "Service failed to start after $MAX_WAIT seconds"
+# Show error page
+chromium-browser --kiosk --noerrdialogs --disable-infobars \
+    "data:text/html,<html><body style='background:#f44336;color:white;display:flex;align-items:center;justify-center;height:100vh;font-family:sans-serif;'><div style='text-align:center;'><h1>Service Failed to Start</h1><p>Please check the system logs</p></div></body></html>" &
+SCRIPT
+
+chmod +x /home/$USER/.cocktail-machine/wait-for-service.sh
+
 # Configure openbox autostart for kiosk mode (Official Raspberry Pi method)
-print_status "Configuring kiosk mode with official Raspberry Pi method..."
+print_status "Configuring kiosk mode with professional loading screen..."
 cat > /home/$USER/.config/openbox/autostart << 'EOF'
 # Disable screen blanking
 xset s off
@@ -221,10 +367,7 @@ xset s noblank
 # Hide mouse cursor after 1 second
 unclutter -idle 1 &
 
-# Wait for network and Docker services
-sleep 15
-
-# Start Chromium in kiosk mode
+# Show loading screen immediately
 chromium-browser --kiosk --noerrdialogs --disable-infobars \
     --check-for-update-interval=604800 \
     --disable-pinch \
@@ -233,7 +376,12 @@ chromium-browser --kiosk --noerrdialogs --disable-infobars \
     --touch-events=enabled \
     --enable-touch-drag-drop \
     --enable-touch-editing \
-    http://localhost:3000 &
+    --disable-features=TranslateUI \
+    --disable-session-crashed-bubble \
+    file:///home/pi/.cocktail-machine/loading.html &
+
+# Wait for service and replace loading screen with dashboard
+/home/pi/.cocktail-machine/wait-for-service.sh &
 EOF
 
 # Set proper permissions
@@ -248,6 +396,29 @@ fi
 
 # Ensure graphical target is set
 sudo systemctl set-default graphical.target
+
+# Configure quiet boot for professional appearance
+print_status "Configuring quiet boot for professional appearance..."
+# Disable boot messages
+if [ -f /boot/cmdline.txt ]; then
+    # Backup original
+    sudo cp /boot/cmdline.txt /boot/cmdline.txt.backup
+    # Add quiet splash if not already present
+    if ! grep -q "quiet" /boot/cmdline.txt; then
+        sudo sed -i 's/$/ quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
+    fi
+fi
+
+# Disable Plymouth boot messages (if installed)
+if command -v plymouth &> /dev/null; then
+    sudo plymouth-set-default-theme -R none 2>/dev/null || true
+fi
+
+# Hide fsck messages
+sudo bash -c 'echo "FSCKFIX=yes" >> /etc/default/rcS' 2>/dev/null || true
+
+# Disable systemd boot messages
+sudo bash -c 'echo "ShowStatus=no" >> /etc/systemd/system.conf' 2>/dev/null || true
 
 print_status "Kiosk mode configured! Dashboard will display on screen at startup."
 
