@@ -283,17 +283,45 @@ if ! command -v startx &> /dev/null && ! command -v chromium-browser &> /dev/nul
     
     # Configure auto-login for lightdm
     print_status "Configuring auto-login..."
+    sudo mkdir -p /etc/lightdm
     sudo bash -c "cat > /etc/lightdm/lightdm.conf" << EOF
-[SeatDefaults]
+[Seat:*]
 autologin-user=$USER
 autologin-user-timeout=0
 user-session=openbox
+greeter-session=pi-greeter
 EOF
     
-    # Enable lightdm
+    # Enable GUI boot
+    print_status "Enabling GUI boot..."
+    sudo systemctl set-default graphical.target
     sudo systemctl enable lightdm.service
     
+    # Configure raspi-config for GUI boot
+    if command -v raspi-config &> /dev/null; then
+        sudo raspi-config nonint do_boot_behaviour B4 || true
+    fi
+    
     print_status "Minimal desktop environment installed."
+    
+    # Create a simple .bash_profile to auto-start X if not running
+    cat >> /home/$USER/.bash_profile << 'EOF'
+
+# Auto-start kiosk mode if on console
+if [ -z "$DISPLAY" ] && [ "$XDG_VTNR" = 1 ]; then
+    exec startx /home/pi/cocktail-machine/kiosk.sh -- -nocursor
+fi
+EOF
+    
+    # Alternative: Configure auto-login on tty1
+    print_status "Configuring console auto-login..."
+    sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
+    sudo bash -c "cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf" << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $USER --noclear %I \$TERM
+EOF
+    sudo systemctl daemon-reload
 fi
 
 # Now proceed with kiosk setup
@@ -521,8 +549,13 @@ fi
 
 echo ""
 if [ -f "$PROJECT_DIR/kiosk.sh" ]; then
-    print_info "Reboot recommended for kiosk mode to take effect."
+    print_info "Reboot to activate kiosk mode:"
     echo "   sudo reboot"
+    echo ""
+    print_info "If dashboard doesn't start automatically after reboot, try:"
+    echo "   startx /home/pi/cocktail-machine/kiosk.sh"
+    echo "   OR"
+    echo "   sudo systemctl start lightdm"
 else
     print_info "Setup script completed. Services should be running."
 fi
