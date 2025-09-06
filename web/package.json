@@ -22,11 +22,10 @@
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
     "lucide-react": "^0.263.0",
-    "mqtt": "^5.0.0",
-    "@types/mqtt": "^2.5.0"
+    "mqtt": "^5.0.0"
   },
   "devDependencies": {
-    "eslint": "^8.0.0",
+    "eslint": "^8.57.0",
     "eslint-config-next": "^14.0.0"
   }
 }
