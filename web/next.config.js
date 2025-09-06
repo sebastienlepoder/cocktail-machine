@@ -5,7 +5,7 @@ const nextConfig = {
   env: {
     MQTT_BROKER_URL: process.env.MQTT_BROKER_URL || 'ws://localhost:9001',
   },
-  output: 'standalone',
+  // Removed standalone output for Docker compatibility
 }
 
 module.exports = nextConfig
