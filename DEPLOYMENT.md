@@ -1,3 +1,376 @@
+# 🚀 Cocktail Machine Deployment & Update System
+
+This document explains how to deploy dashboard updates and how Pi users can easily update their systems.
+
+## 🏗️ System Overview
+
+The cocktail machine uses a sophisticated update system with multiple components:
+
+1. **Development Repository** (`warp-cocktail-machine`) - Where you develop the dashboard
+2. **Deployment Repository** (`cocktail-deploy`) - Stores built releases for Pi downloads
+3. **GitHub Actions** - Automatically builds and deploys updates
+4. **Node-RED Update System** - Built-in update interface on the Pi
+5. **Update Scripts** - Command-line tools for Pi users
+
+## 🔧 Initial Setup
+
+### 1. Create Deployment Repository
+
+First, create the `cocktail-deploy` repository on GitHub:
+
+```bash
+# Create new repository
+gh repo create sebastienlepoder/cocktail-deploy --public --description "Cocktail Machine Pi Deployment Releases"
+
+# Clone and set up basic structure
+git clone https://github.com/sebastienlepoder/cocktail-deploy.git
+cd cocktail-deploy
+
+# Create initial structure
+mkdir -p web scripts kiosk
+echo "v0.0.1" > web/VERSION
+echo "# Cocktail Machine Deployment Repo" > README.md
+
+# Initial commit
+git add .
+git commit -m "Initial deployment repository setup"
+git push origin main
+```
+
+### 2. Configure GitHub Secrets
+
+In your main `warp-cocktail-machine` repository, add these secrets:
+
+1. Go to **Settings** → **Secrets and variables** → **Actions**
+2. Add these repository secrets:
+
+```
+DEPLOY_TOKEN - Personal Access Token with repo permissions
+```
+
+To create the token:
+- Go to **GitHub Settings** → **Developer settings** → **Personal access tokens**
+- Create a token with `repo` permissions
+- Copy the token value to the `DEPLOY_TOKEN` secret
+
+### 3. Set Up Node-RED Flow
+
+Your Node-RED flow already has the update system! It includes:
+- Update status checking at `/api/update/status`
+- Update installation at `/api/update/now` 
+- Built-in UI in the "Updates" tab
+- Automatic version checking every 10 minutes
+
+## 📦 How Deployments Work
+
+### Automatic Deployment
+
+When you push changes to the `main` branch that affect:
+- `web/**` - Dashboard files
+- `scripts/**` - Update scripts  
+- `kiosk/**` - Kiosk setup files
+- `package*.json` - Dependencies
+
+The GitHub Action automatically:
+
+1. **Builds** the dashboard (`npm run build`)
+2. **Creates** a versioned package with timestamp
+3. **Generates** `versions.json` for the update system
+4. **Deploys** to the `cocktail-deploy` repository
+5. **Notifies** you via GitHub Actions summary
+
+### Manual Deployment
+
+You can also trigger deployments manually:
+
+1. Go to **Actions** tab in your repository
+2. Select "Deploy Dashboard to Pi Release Repo"
+3. Click **Run workflow** 
+4. Optionally enable "Force deployment" to deploy even without changes
+
+## 🔄 How Pi Users Update
+
+Pi users have **4 easy ways** to update their dashboard:
+
+### Method 1: Node-RED Dashboard (Recommended)
+1. Open Node-RED dashboard: `http://pi-ip:1880/ui`
+2. Go to **Updates** tab
+3. Click **Install Update** button
+4. Wait for update to complete
+
+### Method 2: API Call
+```bash
+# Check for updates
+curl http://pi-ip:1880/api/update/status
+
+# Install update
+curl -X POST http://pi-ip:1880/api/update/now
+```
+
+### Method 3: Update Script
+```bash
+# Run the full update script
+sudo /opt/scripts/update_dashboard.sh
+
+# Or install specific version
+sudo /opt/scripts/update_dashboard.sh v2.1.0
+```
+
+### Method 4: Quick Update (One-liner)
+```bash
+# Download latest update script and run
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/quick-update.sh)"
+```
+
+### Method 5: Manual Service Start
+If you need to manually start/restart the Docker services:
+```bash
+# Using the convenient start script
+cd ~/cocktail-machine/deployment && ./start-services.sh
+
+# Or using docker-compose directly
+cd ~/cocktail-machine/deployment && docker-compose up -d
+```
+
+## 📝 Version Management
+
+### Version Format
+Versions follow the format: `vYYYY.MM.DD-GITHASH`
+
+Examples:
+- `v2024.12.15-a1b2c3d` - Deployed on Dec 15, 2024
+- `v2024.12.16-f4e5d6c` - Next day update
+
+### Version Files
+
+**`/opt/webroot/VERSION`** - Current installed version on Pi
+**`web/versions.json`** - Available versions and release notes:
+
+```json
+{
+  "dashboard": {
+    "latest": "v2024.12.15-a1b2c3d",
+    "artifact": "web.tar.gz",
+    "notes": [
+      "Updated dashboard from commit a1b2c3d",
+      "Built on 2024-12-15T10:30:00Z",
+      "Latest features and improvements"
+    ]
+  },
+  "modules": {
+    "latest": "v1.0.0",
+    "notes": ["Stable bottle module firmware"]
+  },
+  "backend": {
+    "latest": "v1.0.0", 
+    "notes": ["Node-RED cocktail control flow"]
+  }
+}
+```
+
+## 🛠️ Customization Options
+
+### Environment Variables
+
+Users can customize update behavior with environment variables:
+
+```bash
+# Custom deployment repository
+export DEPLOY_REPO="myusername/my-cocktail-deploy"
+
+# Custom branch
+export BRANCH="production"
+
+# Custom paths
+export WEBROOT="/var/www/html"
+export BACKUP_DIR="/home/pi/backups"
+
+# GitHub token for private repos
+export RAW_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+
+# Then run update
+sudo -E /opt/scripts/update_dashboard.sh
+```
+
+### Custom Update Script Location
+
+Update scripts are downloaded from:
+```
+https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/update_dashboard.sh
+```
+
+You can host your own version by changing the `DEPLOY_REPO` environment variable.
+
+## 🔍 Troubleshooting
+
+### Common Issues
+
+**1. Permission Errors**
+```bash
+# Fix file permissions
+sudo chown -R www-data:www-data /opt/webroot
+sudo chmod -R 755 /opt/webroot
+```
+
+**2. Download Failures**
+```bash
+# Check internet connectivity
+ping github.com
+
+# Check if URLs are accessible
+curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json
+```
+
+**3. Node-RED API Not Working**
+```bash
+# Check if Node-RED is running
+systemctl status nodered
+
+# Check Node-RED logs
+journalctl -u nodered -f
+
+# Restart Node-RED if needed
+sudo systemctl restart nodered
+```
+
+### Logs and Debugging
+
+**Update Script Logs:**
+- The update script provides colored output with detailed status
+- Backups are automatically created in `/opt/backup/`
+
+**Node-RED Logs:**
+```bash
+# View Node-RED logs
+journalctl -u nodered -f
+
+# Check specific update messages
+journalctl -u nodered | grep -i update
+```
+
+**Web Server Logs:**
+```bash
+# Nginx logs
+tail -f /var/log/nginx/error.log
+
+# Apache logs  
+tail -f /var/log/apache2/error.log
+```
+
+## 📚 Development Workflow
+
+### Recommended Development Process
+
+1. **Develop locally** in `warp-cocktail-machine`
+2. **Test changes** in your local environment
+3. **Commit and push** to main branch
+4. **GitHub Actions** automatically deploys to `cocktail-deploy`
+5. **Pi users** get notified and can update via Node-RED UI
+
+### Testing Updates
+
+Before releasing to users, you can test the update system:
+
+1. **Create a test deployment:**
+   ```bash
+   # Create test branch
+   git checkout -b test-update
+   
+   # Make changes and commit
+   git add . && git commit -m "Test update"
+   git push origin test-update
+   ```
+
+2. **Test manual deployment:**
+   - Use GitHub Actions "Run workflow" with your test branch
+   - Verify files are deployed correctly
+
+3. **Test on a Pi:**
+   ```bash
+   # Point to test branch
+   export BRANCH="test-update"
+   sudo -E /opt/scripts/update_dashboard.sh
+   ```
+
+## 🎯 Best Practices
+
+### For Developers
+
+1. **Test before pushing** - Always test locally first
+2. **Use semantic commits** - Clear commit messages help with release notes
+3. **Tag releases** - Use git tags for major versions
+4. **Update documentation** - Keep deployment docs current
+
+### For Pi Users
+
+1. **Backup before updating** - Updates create automatic backups, but manual ones are good too
+2. **Check version first** - Use the Node-RED dashboard to see current/available versions
+3. **Update during low usage** - Updates restart web services briefly
+4. **Keep Node-RED updated** - Occasionally update Node-RED itself with `update-nodejs-and-nodered`
+
+## 🚀 Advanced Features
+
+### Rollback System
+
+If an update causes issues, you can rollback:
+
+```bash
+# List available backups
+ls -la /opt/backup/
+
+# Restore from backup (replace timestamp)
+sudo cp -r /opt/backup/dashboard_backup_v2.1.0_20241215_103000/webroot/* /opt/webroot/
+sudo systemctl restart nginx
+```
+
+### Multiple Environment Support
+
+You can maintain separate deployment environments:
+
+```bash
+# Production updates (default)
+export DEPLOY_REPO="sebastienlepoder/cocktail-deploy"
+export BRANCH="main"
+
+# Development updates
+export DEPLOY_REPO="sebastienlepoder/cocktail-deploy-dev"  
+export BRANCH="development"
+
+# Run update with custom environment
+sudo -E /opt/scripts/update_dashboard.sh
+```
+
+### Private Repository Support
+
+For private repositories, set up authentication:
+
+```bash
+# Create GitHub personal access token
+# Set environment variable
+export RAW_GITHUB_TOKEN="ghp_xxxxxxxxxxxx"
+
+# Updates will now work with private repos
+sudo -E /opt/scripts/update_dashboard.sh
+```
+
+---
+
+## 🎉 Quick Start Summary
+
+**For You (Developer):**
+1. Set up `cocktail-deploy` repository
+2. Add `DEPLOY_TOKEN` secret to your main repo
+3. Push changes to main branch
+4. GitHub Actions handles deployment automatically
+
+**For Pi Users:**
+1. Open Node-RED dashboard at `http://pi-ip:1880/ui`
+2. Go to Updates tab
+3. Click "Install Update"
+4. Enjoy the latest features!
+
+The system is designed to be simple for users while providing powerful automation for developers. Your Node-RED flow already has all the update infrastructure built-in - it's really well designed!
+
 # Cocktail Machine Deployment Guide
 
 This guide provides step-by-step instructions for deploying the Cocktail Machine system on a new Raspberry Pi 5.

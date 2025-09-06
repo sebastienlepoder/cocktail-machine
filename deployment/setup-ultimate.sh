@@ -663,6 +663,34 @@ sudo systemctl enable cocktail-machine.service
 
 print_status "Docker service created and enabled"
 
+# Start Docker services immediately
+print_step "Starting Docker Compose services..."
+cd "$PROJECT_DIR/deployment"
+
+# Ensure user is in docker group for this session
+newgrp docker << EONG
+docker-compose up -d
+EONG
+
+# Alternative method if newgrp doesn't work
+if [ $? -ne 0 ]; then
+    print_info "Trying alternative docker-compose startup method..."
+    sudo -u $USER docker-compose up -d
+fi
+
+if [ $? -eq 0 ]; then
+    print_status "Docker services started successfully"
+    
+    # Wait a moment and check status
+    sleep 5
+    print_info "Docker container status:"
+    docker-compose ps 2>/dev/null || sudo -u $USER docker-compose ps
+else
+    print_error "Failed to start Docker services automatically"
+    print_info "You can start them manually after reboot with:"
+    print_info "cd $PROJECT_DIR/deployment && docker-compose up -d"
+fi
+
 # Step 14: Final system configuration
 print_step "Step 14: Final system configuration..."
 
@@ -735,6 +763,19 @@ else
     print_error "Kiosk startup service not enabled"
 fi
 
+# Test if Docker services are running
+print_info "Checking Docker services status..."
+cd "$PROJECT_DIR/deployment"
+if docker-compose ps | grep -q "Up"; then
+    print_status "Docker services are running"
+    RUNNING_SERVICES=$(docker-compose ps --services --filter "status=running" | wc -l)
+    print_info "Active containers: $RUNNING_SERVICES"
+else
+    print_error "Docker services are not running"
+    print_info "They will start automatically on boot, or manually start them with:"
+    print_info "cd $PROJECT_DIR/deployment && docker-compose up -d"
+fi
+
 print_status "Setup verification completed"
 
 echo ""
@@ -761,6 +802,9 @@ print_info "• Kiosk launcher: /tmp/kiosk-launcher.log"
 print_info "• Service check: /tmp/kiosk-service-check.log"
 echo ""
 print_info "Manual commands:"
+print_info "• Check services: cd $PROJECT_DIR/deployment && docker-compose ps"
+print_info "• Restart services: cd $PROJECT_DIR/deployment && docker-compose restart"
+print_info "• Stop services: cd $PROJECT_DIR/deployment && docker-compose down"
 print_info "• Start services: cd $PROJECT_DIR/deployment && docker-compose up -d"
 print_info "• Test kiosk: DISPLAY=:0 /home/$USER/.cocktail-machine/kiosk-launcher.sh"
 echo ""

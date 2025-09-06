@@ -1,0 +1,202 @@
+name: Deploy Dashboard to Pi Release Repo
+
+on:
+  # Trigger on pushes to main that affect web dashboard files
+  push:
+    branches: [ main ]
+    paths:
+      - 'web/**'
+      - 'scripts/**'
+      - 'kiosk/**'
+      - 'deployment/**'
+      - 'package*.json'
+  
+  # Allow manual workflow dispatch
+  workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Force deployment even if no changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  DEPLOY_REPO: sebastienlepoder/cocktail-deploy
+  SOURCE_BRANCH: main
+  TARGET_BRANCH: main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout source repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: |
+        if [ -d web ]; then
+          cd web
+          npm ci
+        else
+          echo "No web directory found, skipping npm install"
+        fi
+        
+    - name: Build dashboard
+      run: |
+        if [ -d web ]; then
+          cd web
+          npm run build || npm run export || echo "No build script found"
+        else
+          echo "No web directory found, skipping build"
+        fi
+        
+    - name: Generate version info
+      id: version
+      run: |
+        # Generate version based on git info
+        if [ -f VERSION ]; then
+          VERSION=$(cat VERSION)
+        else
+          VERSION="v$(date +%Y.%m.%d)-$(git rev-parse --short HEAD)"
+        fi
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+        echo "Generated version: $VERSION"
+        
+    - name: Create deployment package
+      run: |
+        # Create deployment directory structure
+        mkdir -p deploy/web
+        mkdir -p deploy/scripts
+        mkdir -p deploy/kiosk
+        
+        # Copy built web files
+        if [ -d web/dist ]; then
+          cp -r web/dist/* deploy/web/
+        elif [ -d web/build ]; then
+          cp -r web/build/* deploy/web/
+        elif [ -d web/out ]; then
+          cp -r web/out/* deploy/web/
+        elif [ -d web/public ]; then
+          cp -r web/public/* deploy/web/
+        else
+          echo "No built web files found, copying source"
+          [ -d web ] && cp -r web/* deploy/web/ || echo "No web directory"
+        fi
+        
+        # Copy additional web resources if they exist
+        [ -d web/assets ] && cp -r web/assets deploy/web/ || true
+        [ -d web/static ] && cp -r web/static deploy/web/ || true
+        
+        # Copy deployment and kiosk scripts
+        [ -d scripts ] && cp -r scripts/* deploy/scripts/ || true
+        [ -d kiosk ] && cp -r kiosk/* deploy/kiosk/ || true
+        [ -d deployment ] && find deployment -name "*.sh" -exec cp {} deploy/scripts/ \; 2>/dev/null || true
+        
+        # Make scripts executable
+        find deploy/scripts -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+        
+        # Create version file
+        echo "${{ steps.version.outputs.version }}" > deploy/web/VERSION
+        
+        # Create versions.json for the update system
+        cat > deploy/web/versions.json << EOF
+        {
+          "dashboard": {
+            "latest": "${{ steps.version.outputs.version }}",
+            "artifact": "web.tar.gz",
+            "notes": [
+              "Updated dashboard from commit $(git rev-parse --short HEAD)",
+              "Built on ${{ steps.version.outputs.timestamp }}",
+              "Latest features and improvements"
+            ]
+          },
+          "modules": {
+            "latest": "v1.0.0",
+            "notes": [
+              "Stable bottle module firmware",
+              "MQTT communication protocol"
+            ]
+          },
+          "backend": {
+            "latest": "v1.0.0", 
+            "notes": [
+              "Node-RED cocktail control flow",
+              "MQTT broker and dashboard API"
+            ]
+          }
+        }
+        EOF
+        
+        # Create deployment archive
+        cd deploy
+        tar -czf web.tar.gz web/
+        
+    - name: Checkout deployment repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.DEPLOY_REPO }}
+        token: ${{ secrets.DEPLOY_TOKEN }}
+        path: deploy-repo
+        ref: ${{ env.TARGET_BRANCH }}
+        
+    - name: Update deployment repository
+      run: |
+        cd deploy-repo
+        
+        # Configure git
+        git config user.name "GitHub Actions"
+        git config user.email "actions@github.com"
+        
+        # Remove old files (keep scripts and other non-web content)
+        rm -rf web/ || true
+        
+        # Copy new deployment files
+        cp -r ../deploy/* .
+        
+        # Add all changes
+        git add .
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "No changes to deploy"
+          if [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            echo "Force deployment requested, creating empty commit"
+            git commit --allow-empty -m "Force deployment: ${{ steps.version.outputs.version }}"
+          else
+            exit 0
+          fi
+        else
+          # Commit changes
+          git commit -m "Deploy dashboard ${{ steps.version.outputs.version }}
+
+          - Built from warp-cocktail-machine@$(echo ${{ github.sha }} | head -c 8)
+          - Timestamp: ${{ steps.version.outputs.timestamp }}
+          - Automated deployment from GitHub Actions"
+        fi
+        
+        # Push changes
+        git push origin ${{ env.TARGET_BRANCH }}
+        
+    - name: Create release summary
+      run: |
+        echo "## 🚀 Dashboard Deployed Successfully!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Timestamp:** ${{ steps.version.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Target Repository:** ${{ env.DEPLOY_REPO }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 Pi Users Can Now Update:" >> $GITHUB_STEP_SUMMARY
+        echo "1. **Via Node-RED Dashboard:** Go to Updates tab and click 'Install Update'" >> $GITHUB_STEP_SUMMARY
+        echo "2. **Via API:** \`curl -X POST http://pi-ip:1880/api/update/now\`" >> $GITHUB_STEP_SUMMARY
+        echo "3. **Via Script:** \`sudo /opt/scripts/update_dashboard.sh\`" >> $GITHUB_STEP_SUMMARY
+        echo "4. **Manual Start:** \`cd ~/cocktail-machine/deployment && ./start-services.sh\`" >> $GITHUB_STEP_SUMMARY
