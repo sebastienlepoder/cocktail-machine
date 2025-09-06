@@ -461,6 +461,80 @@ exec $PROJECT_DIR/kiosk.sh
 EOF
     chmod +x "$PROJECT_DIR/start-dashboard.sh"
     
+    # Create framebuffer kiosk script (no X needed)
+    cat > "$PROJECT_DIR/kiosk-fb.sh" << 'EOF'
+#!/bin/bash
+# Framebuffer Kiosk Mode - runs without X server
+
+echo "Starting framebuffer kiosk mode..."
+
+# Wait for services
+sleep 10
+
+# Install chromium if needed
+if ! command -v chromium-browser &> /dev/null && ! command -v chromium &> /dev/null; then
+    echo "Installing Chromium browser..."
+    sudo apt-get update
+    sudo apt-get install -y chromium-browser || sudo apt-get install -y chromium
+fi
+
+# Use chromium in framebuffer mode
+if command -v chromium-browser &> /dev/null; then
+    BROWSER="chromium-browser"
+else
+    BROWSER="chromium"
+fi
+
+# Run browser without X
+sudo $BROWSER \
+    --kiosk \
+    --no-sandbox \
+    --disable-dev-shm-usage \
+    --disable-gpu \
+    --disable-software-rasterizer \
+    --disable-dev-tools \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-translate \
+    --disable-features=TranslateUI \
+    --disk-cache-dir=/tmp/cache \
+    --aggressive-cache-discard \
+    --disable-application-cache \
+    --media-cache-size=1 \
+    --disk-cache-size=1 \
+    --enable-features=OverlayScrollbar \
+    --start-fullscreen \
+    --window-position=0,0 \
+    --display=:0 \
+    http://localhost:3000
+EOF
+    chmod +x "$PROJECT_DIR/kiosk-fb.sh"
+    
+    # Create auto-start service for framebuffer kiosk
+    sudo bash -c "cat > /etc/systemd/system/cocktail-kiosk.service" << EOF
+[Unit]
+Description=Cocktail Machine Kiosk Mode
+After=multi-user.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5s
+User=$USER
+Environment="HOME=/home/$USER"
+ExecStartPre=/bin/sleep 20
+ExecStart=/home/$USER/cocktail-machine/kiosk-fb.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    sudo systemctl daemon-reload
+    sudo systemctl enable cocktail-kiosk.service
+    
     print_status "Kiosk mode configured! Dashboard will display on screen at startup."
     print_info "The system will reboot into kiosk mode."
 else
