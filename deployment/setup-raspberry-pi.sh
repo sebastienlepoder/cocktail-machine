@@ -5,6 +5,17 @@
 
 set -e  # Exit on error
 
+# Set non-interactive mode to prevent prompts
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
+
+# Configure needrestart to not prompt
+if [ -f /etc/needrestart/needrestart.conf ]; then
+    sudo sed -i "s/#\$nrconf{restart} = 'i';/\$nrconf{restart} = 'a';/g" /etc/needrestart/needrestart.conf
+    sudo sed -i "s/#\$nrconf{kernelhints} = -1;/\$nrconf{kernelhints} = -1;/g" /etc/needrestart/needrestart.conf
+fi
+
 echo "========================================="
 echo "Cocktail Machine - Raspberry Pi Setup"
 echo "========================================="
@@ -40,12 +51,14 @@ fi
 
 # Update system
 print_status "Updating system packages..."
-sudo apt-get update
-sudo apt-get upgrade -y
+sudo DEBIAN_FRONTEND=noninteractive apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
 
 # Install required packages
 print_status "Installing required packages..."
-sudo apt-get install -y \
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" \
     curl \
     git \
     wget \
@@ -67,7 +80,7 @@ if ! command -v docker &> /dev/null; then
     
     # Install Docker Compose
     print_status "Installing Docker Compose..."
-    sudo apt-get install -y docker-compose
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y docker-compose
 else
     print_status "Docker already installed"
 fi
@@ -256,8 +269,10 @@ if ! command -v startx &> /dev/null && ! command -v chromium-browser &> /dev/nul
     print_status "No desktop environment detected. Installing minimal GUI for dashboard..."
     
     # Install minimal X server and window manager
-    sudo apt-get update
-    sudo apt-get install -y --no-install-recommends \
+    sudo DEBIAN_FRONTEND=noninteractive apt-get update
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        -o Dpkg::Options::="--force-confdef" \
+        -o Dpkg::Options::="--force-confold" \
         xserver-xorg \
         x11-xserver-utils \
         xinit \
