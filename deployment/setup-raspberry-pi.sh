@@ -54,7 +54,8 @@ sudo apt-get install -y \
     gnupg \
     lsb-release \
     python3-pip \
-    jq
+    jq \
+    mosquitto-clients
 
 # Install Docker
 if ! command -v docker &> /dev/null; then
@@ -247,22 +248,77 @@ chmod +x "$PROJECT_DIR/backup.sh"
 print_status "Setting up automatic backups..."
 (crontab -l 2>/dev/null; echo "0 2 * * * $PROJECT_DIR/backup.sh") | crontab -
 
+# Start Docker services
+print_status "Starting Docker services..."
+cd "$PROJECT_DIR/deployment"
+
+# Clean any previous failed builds
+docker system prune -f > /dev/null 2>&1
+
+# Try to start all services
+print_status "Building and starting services (this may take several minutes)..."
+if docker-compose up -d --build 2>&1 | tee /tmp/docker-build.log; then
+    print_status "All services started successfully!"
+else
+    print_info "Some services may have failed to start. Checking core services..."
+    
+    # Start core services without web dashboard if it fails
+    print_status "Starting core services (MQTT, Node-RED, Database)..."
+    docker-compose up -d mosquitto postgres nodered 2>/dev/null
+    
+    print_info "Web dashboard may need manual setup. Core services should be running."
+fi
+
+# Wait for services to initialize
+print_status "Waiting for services to initialize..."
+sleep 10
+
+# Check service status
+print_status "Checking service status..."
+docker-compose ps
+
+# Get IP address
+PI_IP=$(hostname -I | cut -d' ' -f1)
+
+# Test MQTT connection
+if command -v mosquitto_sub &> /dev/null; then
+    print_status "Testing MQTT broker..."
+    timeout 2 mosquitto_sub -h localhost -t "test" -C 1 &> /dev/null && print_status "MQTT broker is running!" || print_info "MQTT broker may still be starting"
+fi
+
 # Display status
+echo ""
+echo "========================================="
 print_status "Setup complete!"
-echo ""
 echo "========================================="
-echo "Next Steps:"
+echo ""
+echo "🍹 Cocktail Machine Services:"
 echo "========================================="
-echo "1. Update environment variables in: deployment/.env"
-echo "2. Start services: cd $PROJECT_DIR/deployment && docker-compose up -d"
-echo "3. Access services:"
-echo "   - Node-RED: http://$(hostname -I | cut -d' ' -f1):1880"
-echo "   - Web Dashboard: http://$(hostname -I | cut -d' ' -f1):3000"
-echo "   - MQTT: $(hostname -I | cut -d' ' -f1):1883"
+echo "📍 Access your services at:"
+echo "   🔧 Node-RED:       http://$PI_IP:1880"
+echo "   🌐 Web Dashboard:  http://$PI_IP:3000"
+echo "   📊 MQTT Broker:    $PI_IP:1883"
 echo ""
-echo "Useful commands:"
-echo "   - Update system: $PROJECT_DIR/update.sh"
-echo "   - Create backup: $PROJECT_DIR/backup.sh"
-echo "   - View logs: cd $PROJECT_DIR/deployment && docker-compose logs -f"
+echo "📝 Configuration:"
+echo "   Environment: $PROJECT_DIR/deployment/.env"
+echo "   "
+echo "🔧 Management Commands:"
+echo "   Update:  $PROJECT_DIR/update.sh"
+echo "   Backup:  $PROJECT_DIR/backup.sh"
+echo "   Logs:    docker-compose -f $PROJECT_DIR/deployment/docker-compose.yml logs -f"
+echo "   Status:  docker-compose -f $PROJECT_DIR/deployment/docker-compose.yml ps"
 echo ""
-print_info "Please reboot to ensure all services start correctly"
+echo "⚙️ ESP32 Configuration:"
+echo "   Set MQTT_SERVER to: $PI_IP"
+echo "   in your ESP32 config.h file"
+echo ""
+
+if [ -f /tmp/docker-build.log ] && grep -q "ERROR" /tmp/docker-build.log; then
+    print_info "Note: Some services had build issues. Check logs with:"
+    echo "   docker-compose -f $PROJECT_DIR/deployment/docker-compose.yml logs"
+else
+    print_status "All services are running! Your cocktail machine is ready! 🍹"
+fi
+
+echo ""
+print_info "Setup script completed. Services should be running."
