@@ -257,7 +257,7 @@ tail -f /var/log/nginx/error.log
 tail -f /var/log/apache2/error.log
 ```
 
-## 📚 Development Workflow
+## 📝 Development Workflow
 
 ### Recommended Development Process
 
@@ -266,6 +266,8 @@ tail -f /var/log/apache2/error.log
 3. **Commit and push** to main branch
 4. **GitHub Actions** automatically deploys to `cocktail-deploy`
 5. **Pi users** get notified and can update via Node-RED UI
+
+📋 **For detailed deployment workflow, see:** [DEPLOYMENT_WORKFLOW.md](DEPLOYMENT_WORKFLOW.md)
 
 ### Testing Updates
 
