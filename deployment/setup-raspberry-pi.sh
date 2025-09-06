@@ -5,6 +5,29 @@
 
 set -e  # Exit on error
 
+echo "========================================="
+echo "Cocktail Machine - Raspberry Pi Setup"
+echo "========================================="
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    echo -e "${GREEN}[✓]${NC} $1"
+}
+
+print_error() {
+    echo -e "${RED}[✗]${NC} $1"
+}
+
+print_info() {
+    echo -e "${YELLOW}[i]${NC} $1"
+}
+
 # Set non-interactive mode to prevent prompts
 export DEBIAN_FRONTEND=noninteractive
 export NEEDRESTART_MODE=a
@@ -43,29 +66,6 @@ if [ -f /etc/lightdm/lightdm.conf ]; then
 fi
 
 sudo systemctl daemon-reload
-
-echo "========================================="
-echo "Cocktail Machine - Raspberry Pi Setup"
-echo "========================================="
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Function to print colored output
-print_status() {
-    echo -e "${GREEN}[✓]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[✗]${NC} $1"
-}
-
-print_info() {
-    echo -e "${YELLOW}[i]${NC} $1"
-}
 
 # Check if running on Raspberry Pi
 if ! grep -q "Raspberry Pi" /proc/device-tree/model 2>/dev/null; then
