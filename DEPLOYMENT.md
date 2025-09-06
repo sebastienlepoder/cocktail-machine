@@ -457,7 +457,7 @@ Connect to your Raspberry Pi via SSH or directly, then run the **Ultimate Setup 
 
 ```bash
 # Download and run the ultimate kiosk setup script
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/deployment/setup-ultimate.sh -o setup-ultimate.sh
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh -o setup-ultimate.sh
 chmod +x setup-ultimate.sh
 ./setup-ultimate.sh
 ```

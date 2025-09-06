@@ -99,7 +99,7 @@ Save and exit (Ctrl+X, Y, Enter).
 ### 3. Download and set up the kiosk script
 ```bash
 cd ~/cocktail-machine/deployment
-wget https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/deployment/start-kiosk.sh
+wget https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/start-kiosk.sh
 chmod +x start-kiosk.sh
 ```
 

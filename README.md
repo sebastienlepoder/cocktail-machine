@@ -49,7 +49,7 @@ cocktail-machine/
 
 ```bash
 # One-line installation
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/deployment/setup-raspberry-pi.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-raspberry-pi.sh | bash
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
