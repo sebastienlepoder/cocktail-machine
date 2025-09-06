@@ -249,12 +249,44 @@ print_status "Setting up automatic backups..."
 (crontab -l 2>/dev/null; echo "0 2 * * * $PROJECT_DIR/backup.sh") | crontab -
 
 # Setup kiosk mode for dashboard display
-if [ -n "$DISPLAY" ] || [ "$XDG_SESSION_TYPE" = "x11" ] || [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+print_status "Checking for desktop environment..."
+
+# Check if we have a desktop environment, if not install a minimal one
+if ! command -v startx &> /dev/null && ! command -v chromium-browser &> /dev/null && ! command -v chromium &> /dev/null; then
+    print_status "No desktop environment detected. Installing minimal GUI for dashboard..."
+    
+    # Install minimal X server and window manager
+    sudo apt-get update
+    sudo apt-get install -y --no-install-recommends \
+        xserver-xorg \
+        x11-xserver-utils \
+        xinit \
+        openbox \
+        chromium-browser \
+        unclutter \
+        lightdm
+    
+    # Configure auto-login for lightdm
+    print_status "Configuring auto-login..."
+    sudo bash -c "cat > /etc/lightdm/lightdm.conf" << EOF
+[SeatDefaults]
+autologin-user=$USER
+autologin-user-timeout=0
+user-session=openbox
+EOF
+    
+    # Enable lightdm
+    sudo systemctl enable lightdm.service
+    
+    print_status "Minimal desktop environment installed."
+fi
+
+# Now proceed with kiosk setup
+if command -v chromium-browser &> /dev/null || command -v chromium &> /dev/null; then
     print_status "Setting up kiosk mode for dashboard display..."
     
-    # Install required packages for GUI
-    sudo apt-get install -y chromium-browser unclutter xdotool 2>/dev/null || 
-    sudo apt-get install -y chromium unclutter xdotool 2>/dev/null
+    # Install additional required packages
+    sudo apt-get install -y unclutter 2>/dev/null || true
     
     # Create autostart directory if it doesn't exist
     mkdir -p /home/$USER/.config/autostart
@@ -265,34 +297,57 @@ if [ -n "$DISPLAY" ] || [ "$XDG_SESSION_TYPE" = "x11" ] || [ "$XDG_SESSION_TYPE"
 # Cocktail Machine Kiosk Mode Script
 
 # Wait for network and services to be ready
-sleep 30
+echo "Waiting for services to start..."
+sleep 20
 
-# Get the IP address
-PI_IP=$(hostname -I | cut -d' ' -f1)
+# Wait for web service to be available
+while ! curl -s http://localhost:3000 > /dev/null 2>&1; do
+    echo "Waiting for dashboard to be ready..."
+    sleep 5
+done
 
-# Disable screen blanking and power management
-xset s off
-xset -dpms
-xset s noblank
+# Disable screen blanking and power management (if X is available)
+if command -v xset &> /dev/null; then
+    xset s off
+    xset -dpms
+    xset s noblank
+fi
 
 # Hide mouse cursor after 3 seconds of inactivity
-unclutter -idle 3 &
+if command -v unclutter &> /dev/null; then
+    unclutter -idle 3 &
+fi
+
+# Determine which chromium command to use
+if command -v chromium-browser &> /dev/null; then
+    CHROMIUM_CMD="chromium-browser"
+elif command -v chromium &> /dev/null; then
+    CHROMIUM_CMD="chromium"
+else
+    echo "Error: Chromium not found!"
+    exit 1
+fi
+
+echo "Starting dashboard in kiosk mode..."
 
 # Start Chromium in kiosk mode
-chromium-browser --kiosk --noerrdialogs --disable-infobars \
-    --disable-session-crashed-bubble --disable-features=TranslateUI \
-    --check-for-update-interval=604800 --disable-pinch \
+exec $CHROMIUM_CMD \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-session-crashed-bubble \
+    --disable-features=TranslateUI \
+    --check-for-update-interval=604800 \
+    --disable-pinch \
     --overscroll-history-navigation=0 \
-    "http://localhost:3000" &
-
-# Alternative if chromium-browser command doesn't exist
-if [ $? -ne 0 ]; then
-    chromium --kiosk --noerrdialogs --disable-infobars \
-        --disable-session-crashed-bubble --disable-features=TranslateUI \
-        --check-for-update-interval=604800 --disable-pinch \
-        --overscroll-history-navigation=0 \
-        "http://localhost:3000" &
-fi
+    --no-first-run \
+    --disable-translate \
+    --disable-background-timer-throttling \
+    --disable-backgrounding-occluded-windows \
+    --disable-renderer-backgrounding \
+    --window-position=0,0 \
+    --window-size=1920,1080 \
+    "http://localhost:3000"
 EOF
     chmod +x "$PROJECT_DIR/kiosk.sh"
     
@@ -311,6 +366,14 @@ EOF
     if [ -f /home/$USER/.xinitrc ]; then
         echo "exec $PROJECT_DIR/kiosk.sh" >> /home/$USER/.xinitrc
     fi
+    
+    # For Openbox (minimal desktop)
+    mkdir -p /home/$USER/.config/openbox
+    cat > /home/$USER/.config/openbox/autostart << EOF
+# Cocktail Machine Kiosk Autostart
+$PROJECT_DIR/kiosk.sh &
+EOF
+    chmod +x /home/$USER/.config/openbox/autostart
     
     # For systems using LXDE (Raspberry Pi OS Desktop)
     if [ -d /home/$USER/.config/lxsession/LXDE-pi ]; then
@@ -356,9 +419,9 @@ EOF
     chmod +x "$PROJECT_DIR/start-dashboard.sh"
     
     print_status "Kiosk mode configured! Dashboard will display on screen at startup."
+    print_info "The system will reboot into kiosk mode."
 else
-    print_info "No display detected. Skipping kiosk mode setup."
-    print_info "To set up kiosk mode later, run the setup script from the desktop environment."
+    print_info "Chromium browser not available. Please install a desktop environment."
 fi
 
 # Start Docker services
