@@ -6,7 +6,12 @@ import { CocktailMenu } from '@/components/CocktailMenu'
 import { SystemStatus } from '@/components/SystemStatus'
 
 export default function Dashboard() {
-  const [bottles, setBottles] = useState([
+  const [bottles, setBottles] = useState<Array<{
+    id: string
+    name: string
+    level: number
+    status: 'online' | 'offline'
+  }>>([
     { id: 'vodka', name: 'Vodka', level: 75, status: 'online' },
     { id: 'rum', name: 'White Rum', level: 60, status: 'online' },
     { id: 'gin', name: 'Gin', level: 40, status: 'online' },
