@@ -136,6 +136,14 @@ http {
             return 200 "healthy\n";
             add_header Content-Type text/plain;
         }
+        
+        # WebSocket support for Next.js
+        location /ws {
+            proxy_pass http://dashboard;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
     }
 }
 EOF
@@ -483,12 +491,21 @@ chmod +x /home/$USER/.xinitrc
 # Step 10: Configure auto-login
 print_step "Step 10: Configuring auto-login..."
 
-# Configure LightDM for auto-login
+# Try raspi-config first (works on full Raspberry Pi OS)
+if command -v raspi-config &> /dev/null; then
+    print_info "Trying raspi-config for desktop auto-login..."
+    sudo raspi-config nonint do_boot_behaviour B4 2>/dev/null || print_info "raspi-config B4 not available (likely Lite version)"
+fi
+
+# Configure LightDM for auto-login (works on both Full and Lite)
+print_info "Configuring LightDM auto-login..."
 sudo mkdir -p /etc/lightdm/lightdm.conf.d
 sudo tee /etc/lightdm/lightdm.conf.d/01-autologin.conf > /dev/null << EOF
 [Seat:*]
 autologin-user=$USER
 autologin-user-timeout=0
+user-session=openbox
+greeter-session=lightdm-gtk-greeter
 EOF
 
 # Enable graphical target
@@ -497,13 +514,52 @@ sudo systemctl set-default graphical.target
 # Enable LightDM
 sudo systemctl enable lightdm
 
-# Configure console auto-login as backup
+# Create a systemd service to ensure kiosk starts
+print_info "Creating kiosk startup service..."
+sudo tee /etc/systemd/system/cocktail-kiosk-startup.service > /dev/null << EOF
+[Unit]
+Description=Start Cocktail Machine Kiosk
+After=lightdm.service graphical.target
+Wants=lightdm.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+ExecStartPre=/bin/sleep 10
+ExecStart=/bin/bash -c 'systemctl start lightdm; sleep 5; sudo -u $USER DISPLAY=:0 /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+sudo systemctl enable cocktail-kiosk-startup.service
+
+# Configure console auto-login as fallback
 sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
 sudo tee /etc/systemd/system/getty@tty1.service.d/autologin.conf > /dev/null << EOF
 [Service]
 ExecStart=
 ExecStart=-/sbin/agetty --autologin $USER --noclear %I \$TERM
 EOF
+
+# Add kiosk start to .bashrc as ultimate fallback
+print_info "Adding .bashrc fallback..."
+if ! grep -q "kiosk-launcher" /home/$USER/.bashrc; then
+    cat >> /home/$USER/.bashrc << 'BASHRC'
+
+# Auto-start kiosk if not SSH session and no desktop running
+if [ -z "$SSH_TTY" ] && [ -z "$DISPLAY" ] && [ "$TERM" = "linux" ]; then
+    if [ $(tty) = "/dev/tty1" ]; then
+        echo "Starting desktop and kiosk mode..."
+        startx -- -nocursor &
+        sleep 8
+        export DISPLAY=:0
+        /home/$USER/.cocktail-machine/kiosk-launcher.sh &
+    fi
+fi
+BASHRC
+fi
 
 # Step 11: Configure boot for kiosk mode
 print_step "Step 11: Configuring boot parameters..."
