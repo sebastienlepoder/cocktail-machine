@@ -4,13 +4,34 @@ This document explains how to deploy dashboard updates and how Pi users can easi
 
 ## 🏗️ System Overview
 
-The cocktail machine uses a sophisticated update system with multiple components:
+### 📚 Repository Structure
 
-1. **Development Repository** (`warp-cocktail-machine`) - Where you develop the dashboard
-2. **Deployment Repository** (`cocktail-deploy`) - Stores built releases for Pi downloads
-3. **GitHub Actions** - Automatically builds and deploys updates
-4. **Node-RED Update System** - Built-in update interface on the Pi
-5. **Update Scripts** - Command-line tools for Pi users
+The cocktail machine uses a **dev → production deployment model** with separate repositories:
+
+| Repository | Type | Purpose | URL |
+|------------|------|---------|-----|
+| `warp-cocktail-machine` | **Local Dev** | Your development environment | *This repo* |
+| `cocktail-machine` | **GitHub Dev** | Development repo (synced via Warp) | https://github.com/sebastienlepoder/cocktail-machine |
+| `cocktail-deploy` | **Production** | Built releases for Pi users | https://github.com/sebastienlepoder/cocktail-deploy |
+
+### 🔄 Deployment Flow
+
+```
+💻 Local Development    🚀 GitHub Dev         🏭 Production          🤖 Pi Users
+(warp-cocktail-     (cocktail-machine)   (cocktail-deploy)    (Raspberry Pi)
+machine)            │                    │                   │
+│                   │                    │                   │
+│-- Warp sync ---▶│                    │                   │
+                    │-- Manual deploy -▶│                   │
+                                          │-- Auto notify -▶│
+```
+
+### 🏠 System Components
+
+1. **GitHub Actions** - Manual deployment workflow (dev → prod)
+2. **Node-RED Update System** - Built-in update interface on the Pi
+3. **Update Scripts** - Command-line tools for Pi users
+4. **Version Management** - Automatic versioning and release notes
 
 ## 🔧 Initial Setup
 
@@ -39,19 +60,21 @@ git push origin main
 
 ### 2. Configure GitHub Secrets
 
-In your main `warp-cocktail-machine` repository, add these secrets:
+In your **development repository** (`cocktail-machine` on GitHub), add these secrets:
 
-1. Go to **Settings** → **Secrets and variables** → **Actions**
-2. Add these repository secrets:
+1. Go to https://github.com/sebastienlepoder/cocktail-machine/settings/secrets/actions
+2. Click **"New repository secret"**
+3. Add this secret:
 
 ```
-DEPLOY_TOKEN - Personal Access Token with repo permissions
+Name: DEPLOY_TOKEN
+Value: [Your Personal Access Token]
 ```
 
-To create the token:
+**To create the Personal Access Token:**
 - Go to **GitHub Settings** → **Developer settings** → **Personal access tokens**
 - Create a token with `repo` permissions
-- Copy the token value to the `DEPLOY_TOKEN` secret
+- Copy the token value to use as the `DEPLOY_TOKEN` secret value
 
 ### 3. Set Up Node-RED Flow
 
@@ -63,30 +86,42 @@ Your Node-RED flow already has the update system! It includes:
 
 ## 📦 How Deployments Work
 
-### Automatic Deployment
+### Development to Production Workflow
 
-When you push changes to the `main` branch that affect:
-- `web/**` - Dashboard files
-- `scripts/**` - Update scripts  
-- `kiosk/**` - Kiosk setup files
-- `package*.json` - Dependencies
+**Your repositories:**
+- **Development:** `warp-cocktail-machine` (local) ↔ `cocktail-machine` (GitHub)
+- **Production:** `cocktail-deploy` (GitHub)
 
-The GitHub Action automatically:
+**Deployment process:**
+1. **Develop locally** in `warp-cocktail-machine` (synced to `cocktail-machine` via Warp)
+2. **When ready for production:** Manually deploy from dev to prod
+3. **Pi users:** Get automatic update notifications
 
-1. **Builds** the dashboard (`npm run build`)
-2. **Creates** a versioned package with timestamp
+### Manual Dev → Prod Deployment (Recommended)
+
+**When your dev repo is ready for Pi users:**
+
+1. Go to **Actions** tab in [`cocktail-machine`](https://github.com/sebastienlepoder/cocktail-machine) repository
+2. Select **"🚀 Dev → Prod Deployment"** workflow
+3. Click **"Run workflow"**
+4. Fill out the deployment form:
+   - **Release type:** `minor` (normal), `patch` (bugfix), `major` (big changes)
+   - **Release notes:** Description of what's new
+   - **Force deploy:** Only if deploying without changes
+5. Click **"Run workflow"** button
+6. **Wait 2-3 minutes** for completion
+7. **Pi users get notified** automatically!
+
+**What happens during deployment:**
+1. **Builds** the dashboard from your dev repo (`npm run build`)
+2. **Creates** production package with version number
 3. **Generates** `versions.json` for the update system
-4. **Deploys** to the `cocktail-deploy` repository
-5. **Notifies** you via GitHub Actions summary
+4. **Deploys** to the `cocktail-deploy` production repository
+5. **Updates** Pi user notification system
 
-### Manual Deployment
+### Legacy Auto-Deployment
 
-You can also trigger deployments manually:
-
-1. Go to **Actions** tab in your repository
-2. Select "Deploy Dashboard to Pi Release Repo"
-3. Click **Run workflow** 
-4. Optionally enable "Force deployment" to deploy even without changes
+*Note: The auto-deployment workflow is still available but not the recommended approach for production releases.*
 
 ## 🔄 How Pi Users Update
 
@@ -261,13 +296,15 @@ tail -f /var/log/apache2/error.log
 
 ### Recommended Development Process
 
-1. **Develop locally** in `warp-cocktail-machine`
+1. **Develop locally** in `warp-cocktail-machine` (this repo)
 2. **Test changes** in your local environment
-3. **Commit and push** to main branch
-4. **GitHub Actions** automatically deploys to `cocktail-deploy`
-5. **Pi users** get notified and can update via Node-RED UI
+3. **Warp automatically syncs** your changes to `cocktail-machine` GitHub repo
+4. **When ready for production:** Go to GitHub Actions and run **"Dev → Prod Deployment"**
+5. **GitHub Actions** builds and deploys to `cocktail-deploy` production repo
+6. **Pi users** get notified and can update via Node-RED UI
 
-📋 **For detailed deployment workflow, see:** [DEPLOYMENT_WORKFLOW.md](DEPLOYMENT_WORKFLOW.md)
+📋 **For detailed deployment workflow, see:** [HOW_TO_DEPLOY.md](HOW_TO_DEPLOY.md) ← **Simple 3-step guide**  
+📋 **For advanced deployment docs, see:** [DEPLOYMENT_WORKFLOW.md](DEPLOYMENT_WORKFLOW.md)
 
 ### Testing Updates
 
@@ -360,18 +397,22 @@ sudo -E /opt/scripts/update_dashboard.sh
 ## 🎉 Quick Start Summary
 
 **For You (Developer):**
-1. Set up `cocktail-deploy` repository
-2. Add `DEPLOY_TOKEN` secret to your main repo
-3. Push changes to main branch
-4. GitHub Actions handles deployment automatically
+1. ✅ `cocktail-deploy` repository already set up
+2. ✅ `DEPLOY_TOKEN` secret already configured  
+3. **Develop locally** in `warp-cocktail-machine` (syncs to GitHub automatically)
+4. **When ready for production:** Go to GitHub Actions → **"🚀 Dev → Prod Deployment"** → Run workflow
+5. **Pi users get notified** automatically!
 
 **For Pi Users:**
 1. Open Node-RED dashboard at `http://pi-ip:1880/ui`
-2. Go to Updates tab
+2. Go to Updates tab (updates appear within 10 minutes)
 3. Click "Install Update"
 4. Enjoy the latest features!
 
-The system is designed to be simple for users while providing powerful automation for developers. Your Node-RED flow already has all the update infrastructure built-in - it's really well designed!
+**🚀 Your deployment workflow is now:**  
+**Local Dev** → **Warp Sync** → **Manual Deploy** → **Pi Users Notified** → **One-Click Updates**
+
+The system is designed for **controlled, manual deployments** while providing **automatic updates** for Pi users!
 
 # Cocktail Machine Deployment Guide
 
