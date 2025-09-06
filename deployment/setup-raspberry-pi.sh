@@ -248,6 +248,119 @@ chmod +x "$PROJECT_DIR/backup.sh"
 print_status "Setting up automatic backups..."
 (crontab -l 2>/dev/null; echo "0 2 * * * $PROJECT_DIR/backup.sh") | crontab -
 
+# Setup kiosk mode for dashboard display
+if [ -n "$DISPLAY" ] || [ "$XDG_SESSION_TYPE" = "x11" ] || [ "$XDG_SESSION_TYPE" = "wayland" ]; then
+    print_status "Setting up kiosk mode for dashboard display..."
+    
+    # Install required packages for GUI
+    sudo apt-get install -y chromium-browser unclutter xdotool 2>/dev/null || 
+    sudo apt-get install -y chromium unclutter xdotool 2>/dev/null
+    
+    # Create autostart directory if it doesn't exist
+    mkdir -p /home/$USER/.config/autostart
+    
+    # Create kiosk script
+    cat > "$PROJECT_DIR/kiosk.sh" << 'EOF'
+#!/bin/bash
+# Cocktail Machine Kiosk Mode Script
+
+# Wait for network and services to be ready
+sleep 30
+
+# Get the IP address
+PI_IP=$(hostname -I | cut -d' ' -f1)
+
+# Disable screen blanking and power management
+xset s off
+xset -dpms
+xset s noblank
+
+# Hide mouse cursor after 3 seconds of inactivity
+unclutter -idle 3 &
+
+# Start Chromium in kiosk mode
+chromium-browser --kiosk --noerrdialogs --disable-infobars \
+    --disable-session-crashed-bubble --disable-features=TranslateUI \
+    --check-for-update-interval=604800 --disable-pinch \
+    --overscroll-history-navigation=0 \
+    "http://localhost:3000" &
+
+# Alternative if chromium-browser command doesn't exist
+if [ $? -ne 0 ]; then
+    chromium --kiosk --noerrdialogs --disable-infobars \
+        --disable-session-crashed-bubble --disable-features=TranslateUI \
+        --check-for-update-interval=604800 --disable-pinch \
+        --overscroll-history-navigation=0 \
+        "http://localhost:3000" &
+fi
+EOF
+    chmod +x "$PROJECT_DIR/kiosk.sh"
+    
+    # Create desktop autostart entry
+    cat > /home/$USER/.config/autostart/cocktail-kiosk.desktop << EOF
+[Desktop Entry]
+Type=Application
+Name=Cocktail Machine Dashboard
+Exec=$PROJECT_DIR/kiosk.sh
+Hidden=false
+X-GNOME-Autostart-enabled=true
+Comment=Start Cocktail Machine Dashboard in Kiosk Mode
+EOF
+    
+    # For Raspberry Pi OS Lite with X11 (if using startx)
+    if [ -f /home/$USER/.xinitrc ]; then
+        echo "exec $PROJECT_DIR/kiosk.sh" >> /home/$USER/.xinitrc
+    fi
+    
+    # For systems using LXDE (Raspberry Pi OS Desktop)
+    if [ -d /home/$USER/.config/lxsession/LXDE-pi ]; then
+        mkdir -p /home/$USER/.config/lxsession/LXDE-pi
+        cat > /home/$USER/.config/lxsession/LXDE-pi/autostart << EOF
+@lxpanel --profile LXDE-pi
+@pcmanfm --desktop --profile LXDE-pi
+@xscreensaver -no-splash
+@$PROJECT_DIR/kiosk.sh
+EOF
+    fi
+    
+    # For Wayfire (newer Raspberry Pi OS)
+    if [ -f /home/$USER/.config/wayfire.ini ]; then
+        print_info "Configuring Wayfire for kiosk mode..."
+        # Add autostart entry to wayfire.ini if not already present
+        if ! grep -q "cocktail-kiosk" /home/$USER/.config/wayfire.ini; then
+            cat >> /home/$USER/.config/wayfire.ini << EOF
+
+[autostart]
+coctail_kiosk = $PROJECT_DIR/kiosk.sh
+EOF
+        fi
+    fi
+    
+    # Disable screen blanking in console
+    sudo bash -c 'echo -e "\n# Disable screen blanking\nconsoleblank=0" >> /boot/cmdline.txt' 2>/dev/null || true
+    
+    # Create a simple launcher script
+    cat > "$PROJECT_DIR/start-dashboard.sh" << 'EOF'
+#!/bin/bash
+# Manual launcher for Cocktail Machine Dashboard
+
+echo "Starting Cocktail Machine Dashboard..."
+echo "Press Ctrl+Alt+F1 to exit kiosk mode"
+
+# Kill any existing browser instances
+pkill -f chromium
+
+# Start the kiosk
+exec $PROJECT_DIR/kiosk.sh
+EOF
+    chmod +x "$PROJECT_DIR/start-dashboard.sh"
+    
+    print_status "Kiosk mode configured! Dashboard will display on screen at startup."
+else
+    print_info "No display detected. Skipping kiosk mode setup."
+    print_info "To set up kiosk mode later, run the setup script from the desktop environment."
+fi
+
 # Start Docker services
 print_status "Starting Docker services..."
 cd "$PROJECT_DIR/deployment"
@@ -312,6 +425,14 @@ echo "⚙️ ESP32 Configuration:"
 echo "   Set MQTT_SERVER to: $PI_IP"
 echo "   in your ESP32 config.h file"
 echo ""
+echo "🖥️ Display Configuration:"
+if [ -f "$PROJECT_DIR/kiosk.sh" ]; then
+    echo "   ✅ Kiosk mode configured - Dashboard will display on screen at startup"
+    echo "   Manual start: $PROJECT_DIR/start-dashboard.sh"
+else
+    echo "   ℹ️ Connect a display and run setup again for kiosk mode"
+fi
+echo ""
 
 if [ -f /tmp/docker-build.log ] && grep -q "ERROR" /tmp/docker-build.log; then
     print_info "Note: Some services had build issues. Check logs with:"
@@ -321,4 +442,9 @@ else
 fi
 
 echo ""
-print_info "Setup script completed. Services should be running."
+if [ -f "$PROJECT_DIR/kiosk.sh" ]; then
+    print_info "Reboot recommended for kiosk mode to take effect."
+    echo "   sudo reboot"
+else
+    print_info "Setup script completed. Services should be running."
+fi
