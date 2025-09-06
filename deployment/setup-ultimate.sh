@@ -458,11 +458,35 @@ cat > /home/$USER/.cocktail-machine/loading.html << 'EOF'
 </html>
 EOF
 
-# Step 8: Configure OpenBox
-print_step "Step 8: Configuring OpenBox..."
+# Step 8: Configure X11 properly for Raspberry Pi
+print_step "Step 8: Configuring X11 for Raspberry Pi..."
+
+# Create X11 configuration for framebuffer
+sudo mkdir -p /etc/X11/xorg.conf.d
+sudo tee /etc/X11/xorg.conf.d/99-fbdev.conf > /dev/null << 'EOF'
+Section "Device"
+    Identifier "fbdev"
+    Driver "fbdev"
+    Option "fbdev" "/dev/fb0"
+    Option "ShadowFB" "off"
+EndSection
+
+Section "Screen"
+    Identifier "fbdev"
+    Device "fbdev"
+    Monitor "Monitor0"
+EndSection
+
+Section "Monitor"
+    Identifier "Monitor0"
+EndSection
+EOF
+
+# Configure OpenBox
+print_step "Step 9: Configuring OpenBox..."
 mkdir -p /home/$USER/.config/openbox
 
-cat > /home/$USER/.config/openbox/autostart << 'EOF'
+cat > /home/$USER/.config/openbox/autostart << EOF
 # Disable screen blanking and power management
 xset s off
 xset -dpms
@@ -472,7 +496,7 @@ xset s noblank
 unclutter -idle 1 -root &
 
 # Wait for X to fully initialize
-sleep 3
+sleep 5
 
 # Start the kiosk launcher
 /home/$USER/.cocktail-machine/kiosk-launcher.sh &
@@ -480,16 +504,31 @@ EOF
 
 chmod +x /home/$USER/.config/openbox/autostart
 
-# Step 9: Configure X11 startup
-print_step "Step 9: Configuring X11 startup..."
+# Create autostart desktop file for additional reliability
+mkdir -p /home/$USER/.config/autostart
+cat > /home/$USER/.config/autostart/cocktail-kiosk.desktop << EOF
+[Desktop Entry]
+Type=Application
+Name=Cocktail Machine Kiosk
+Exec=/home/$USER/.cocktail-machine/kiosk-launcher.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+StartupNotify=false
+EOF
+
+# Step 10: Configure X11 startup
+print_step "Step 10: Configuring X11 startup..."
 cat > /home/$USER/.xinitrc << 'EOF'
 #!/bin/sh
+# Ensure proper X11 environment
+export DISPLAY=:0
 exec openbox-session
 EOF
 chmod +x /home/$USER/.xinitrc
 
-# Step 10: Configure auto-login
-print_step "Step 10: Configuring auto-login..."
+# Step 11: Configure auto-login
+print_step "Step 11: Configuring auto-login..."
 
 # Try raspi-config first (works on full Raspberry Pi OS)
 if command -v raspi-config &> /dev/null; then
@@ -519,20 +558,26 @@ print_info "Creating kiosk startup service..."
 sudo tee /etc/systemd/system/cocktail-kiosk-startup.service > /dev/null << EOF
 [Unit]
 Description=Start Cocktail Machine Kiosk
-After=lightdm.service graphical.target
+After=lightdm.service graphical.target multi-user.target
 Wants=lightdm.service
+Requires=graphical.target
 
 [Service]
-Type=oneshot
-RemainAfterExit=yes
+Type=forking
 User=root
-ExecStartPre=/bin/sleep 10
-ExecStart=/bin/bash -c 'systemctl start lightdm; sleep 5; sudo -u $USER DISPLAY=:0 /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
+Environment=DISPLAY=:0
+ExecStartPre=/bin/sleep 15
+ExecStartPre=/bin/bash -c 'while ! systemctl is-active lightdm >/dev/null 2>&1; do sleep 2; done'
+ExecStart=/bin/bash -c 'sudo -u $USER DISPLAY=:0 XAUTHORITY=/home/$USER/.Xauthority /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
+RemainAfterExit=yes
+Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=graphical.target
 EOF
 
+sudo systemctl daemon-reload
 sudo systemctl enable cocktail-kiosk-startup.service
 
 # Configure console auto-login as fallback
@@ -561,8 +606,8 @@ fi
 BASHRC
 fi
 
-# Step 11: Configure boot for kiosk mode
-print_step "Step 11: Configuring boot parameters..."
+# Step 12: Configure boot for kiosk mode
+print_step "Step 12: Configuring boot parameters..."
 
 # Find the correct cmdline.txt file
 CMDLINE_FILE=""
@@ -591,8 +636,8 @@ else
     print_error "Could not find cmdline.txt file"
 fi
 
-# Step 12: Create Docker service
-print_step "Step 12: Creating Docker service..."
+# Step 13: Create Docker service
+print_step "Step 13: Creating Docker service..."
 sudo tee /etc/systemd/system/cocktail-machine.service > /dev/null << EOF
 [Unit]
 Description=Cocktail Machine Docker Services
@@ -619,8 +664,8 @@ sudo systemctl enable cocktail-machine.service
 
 print_status "Docker service created and enabled"
 
-# Step 13: Final system configuration
-print_step "Step 13: Final system configuration..."
+# Step 14: Final system configuration
+print_step "Step 14: Final system configuration..."
 
 # Disable unnecessary services
 sudo systemctl disable bluetooth.service 2>/dev/null || true
@@ -651,6 +696,47 @@ if [ -n "$CONFIG_FILE" ]; then
 fi
 
 print_status "System configuration completed"
+
+# Step 15: Final verification
+print_step "Step 15: Verifying setup..."
+
+# Test if nginx config is valid
+if [ -f "deployment/nginx/nginx.conf" ]; then
+    if grep -q "/health" "deployment/nginx/nginx.conf"; then
+        print_status "Nginx health endpoint configured"
+    else
+        print_error "Nginx health endpoint missing"
+    fi
+fi
+
+# Test if kiosk scripts exist
+if [ -f "/home/$USER/.cocktail-machine/kiosk-launcher.sh" ]; then
+    print_status "Kiosk launcher script created"
+else
+    print_error "Kiosk launcher script missing"
+fi
+
+# Test if LightDM is configured
+if [ -f "/etc/lightdm/lightdm.conf.d/01-autologin.conf" ]; then
+    print_status "LightDM auto-login configured"
+else
+    print_error "LightDM auto-login not configured"
+fi
+
+# Test if systemd services are enabled
+if systemctl is-enabled cocktail-machine.service >/dev/null 2>&1; then
+    print_status "Docker service enabled"
+else
+    print_error "Docker service not enabled"
+fi
+
+if systemctl is-enabled cocktail-kiosk-startup.service >/dev/null 2>&1; then
+    print_status "Kiosk startup service enabled"
+else
+    print_error "Kiosk startup service not enabled"
+fi
+
+print_status "Setup verification completed"
 
 echo ""
 echo "=================================================="
