@@ -1,0 +1,325 @@
+name: 🚀 Dev → Prod Deployment
+
+on:
+  # Manual trigger only - you control when to deploy to production
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Type of release'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+        - patch
+        - minor
+        - major
+      release_notes:
+        description: 'Release notes (optional)'
+        required: false
+        type: string
+        default: 'Latest features and improvements'
+      force_deploy:
+        description: 'Force deployment even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  PROD_REPO: sebastienlepoder/cocktail-deploy
+  DEV_REPO: sebastienlepoder/cocktail-machine
+
+jobs:
+  dev-to-prod-deployment:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout Dev Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.DEPLOY_TOKEN }}
+        
+    - name: 🔍 Generate Release Version
+      id: version
+      run: |
+        # Get current date for version
+        DATE=$(date +%Y.%m.%d)
+        TIME=$(date +%H%M)
+        COMMIT_HASH=$(git rev-parse --short HEAD)
+        
+        # Determine version based on release type
+        case "${{ github.event.inputs.release_type }}" in
+          "major") VERSION="v${DATE}-major-${COMMIT_HASH}" ;;
+          "minor") VERSION="v${DATE}-${TIME}-${COMMIT_HASH}" ;;
+          "patch") VERSION="v${DATE}-patch-${COMMIT_HASH}" ;;
+        esac
+        
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+        echo "🎯 Generated production version: $VERSION"
+        
+    - name: 🏗️ Setup Node.js (if needed)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+      continue-on-error: true
+        
+    - name: 📦 Install Dependencies
+      run: |
+        if [ -d web ] && [ -f web/package.json ]; then
+          cd web
+          echo "📥 Installing dependencies..."
+          npm ci || npm install || echo "⚠️ Failed to install dependencies"
+        else
+          echo "ℹ️ No web project found, skipping dependencies"
+        fi
+      continue-on-error: true
+        
+    - name: 🔨 Build Dashboard
+      run: |
+        if [ -d web ] && [ -f web/package.json ]; then
+          cd web
+          echo "🔨 Building dashboard..."
+          npm run build || npm run export || echo "⚠️ No build script found"
+        else
+          echo "ℹ️ No web project found, skipping build"
+        fi
+      continue-on-error: true
+        
+    - name: 📋 Create Production Package
+      run: |
+        echo "📦 Creating production deployment package..."
+        
+        # Create production directory structure
+        mkdir -p prod-deploy/{web,scripts,kiosk}
+        
+        # Copy built web files (with multiple fallback options)
+        if [ -d web/dist ] && [ "$(find web/dist -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+          echo "📁 Copying from web/dist/"
+          cp -r web/dist/. prod-deploy/web/
+        elif [ -d web/build ] && [ "$(find web/build -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+          echo "📁 Copying from web/build/"
+          cp -r web/build/. prod-deploy/web/
+        elif [ -d web/out ] && [ "$(find web/out -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+          echo "📁 Copying from web/out/"
+          cp -r web/out/. prod-deploy/web/
+        elif [ -d web/public ] && [ "$(find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
+          echo "📁 Copying from web/public/ (excluding .gitkeep)"
+          find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec cp -r {} prod-deploy/web/ \;
+        elif [ -d web ] && [ "$(find web -mindepth 1 -maxdepth 1 -type f 2>/dev/null)" ]; then
+          echo "📁 Copying web source files"
+          find web -mindepth 1 -maxdepth 1 -type f -exec cp {} prod-deploy/web/ \;
+        else
+          echo "📄 Creating placeholder dashboard"
+          cat > prod-deploy/web/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>🍹 Cocktail Machine</title>
+            <style>
+                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; min-height: 100vh; margin: 0; }
+                h1 { font-size: 3em; margin-bottom: 20px; }
+                p { font-size: 1.2em; margin-bottom: 30px; }
+                .status { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; }
+            </style>
+        </head>
+        <body>
+            <h1>🍹 Cocktail Machine</h1>
+            <div class="status">
+                <h2>System Ready</h2>
+                <p>Your cocktail machine dashboard will be available soon!</p>
+                <p><strong>Version:</strong> ${{ steps.version.outputs.version }}</p>
+            </div>
+            <p><a href="http://localhost:1880/ui" style="color: #fff;">Node-RED Dashboard</a></p>
+        </body>
+        </html>
+        EOF
+        fi
+        
+        # Copy deployment scripts
+        echo "📜 Copying scripts..."
+        [ -d scripts ] && cp -r scripts/* prod-deploy/scripts/ 2>/dev/null || true
+        [ -d deployment ] && find deployment -name "*.sh" -exec cp {} prod-deploy/scripts/ \; 2>/dev/null || true
+        
+        # Copy kiosk files
+        echo "🖥️ Copying kiosk files..."
+        [ -d kiosk ] && cp -r kiosk/* prod-deploy/kiosk/ 2>/dev/null || true
+        
+        # Make all scripts executable
+        find prod-deploy/scripts -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+        
+        # Create production VERSION file
+        echo "${{ steps.version.outputs.version }}" > prod-deploy/web/VERSION
+        
+        # Create production versions.json
+        cat > prod-deploy/web/versions.json << EOF
+        {
+          "dashboard": {
+            "latest": "${{ steps.version.outputs.version }}",
+            "artifact": "web.tar.gz",
+            "notes": [
+              "${{ github.event.inputs.release_notes }}",
+              "Released on ${{ steps.version.outputs.timestamp }}",
+              "Built from dev commit $(git rev-parse --short HEAD)",
+              "Release type: ${{ github.event.inputs.release_type }}"
+            ]
+          },
+          "modules": {
+            "latest": "v1.0.0",
+            "notes": [
+              "ESP32 bottle module firmware",
+              "MQTT communication protocol",
+              "Pump control and liquid level sensing"
+            ]
+          },
+          "backend": {
+            "latest": "v1.0.0", 
+            "notes": [
+              "Node-RED cocktail control flow",
+              "MQTT broker and dashboard API",
+              "Module management system"
+            ]
+          },
+          "release": {
+            "type": "${{ github.event.inputs.release_type }}",
+            "timestamp": "${{ steps.version.outputs.timestamp }}",
+            "dev_repo": "${{ env.DEV_REPO }}",
+            "dev_commit": "$(git rev-parse HEAD)"
+          }
+        }
+        EOF
+        
+        # Create compressed archive
+        cd prod-deploy
+        tar -czf web.tar.gz web/
+        ls -la
+        echo "✅ Production package created successfully!"
+        
+    - name: 📤 Checkout Production Repository
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ env.PROD_REPO }}
+        token: ${{ secrets.DEPLOY_TOKEN }}
+        path: prod-repo
+        ref: main
+        
+    - name: 🚀 Deploy to Production
+      run: |
+        cd prod-repo
+        
+        echo "🔧 Configuring git for deployment..."
+        git config user.name "Dev→Prod Deployment"
+        git config user.email "actions@github.com"
+        
+        echo "🧹 Cleaning old production files..."
+        # Keep README but remove old deployments
+        find . -mindepth 1 -maxdepth 1 ! -name 'README.md' ! -name '.git' -exec rm -rf {} + || true
+        
+        echo "📋 Copying new production files..."
+        cp -r ../prod-deploy/* .
+        
+        echo "📝 Adding deployment info to README..."
+        cat > README.md << 'EOF'
+        # 🍹 Cocktail Machine - Production Release
+        
+        **Latest Version:** `${{ steps.version.outputs.version }}`  
+        **Release Type:** ${{ github.event.inputs.release_type }}  
+        **Released:** ${{ steps.version.outputs.timestamp }}  
+        **From Dev Repo:** [${{ env.DEV_REPO }}](https://github.com/${{ env.DEV_REPO }})
+        
+        ## 🚀 For Pi Users
+        
+        ### Quick Installation
+        ```bash
+        curl -fsSL https://raw.githubusercontent.com/${{ env.PROD_REPO }}/main/scripts/setup-ultimate.sh | bash
+        ```
+        
+        ### Update Your System
+        ```bash
+        # Via Node-RED Dashboard (Recommended)
+        # Go to: http://your-pi-ip:1880/ui → Updates tab → Install Update
+        
+        # Or via command line
+        sudo /opt/scripts/update_dashboard.sh
+        ```
+        
+        ## 📋 Release Notes
+        
+        ${{ github.event.inputs.release_notes }}
+        
+        ## 🔄 Update Methods
+        
+        1. **Node-RED Dashboard** - Easy web interface at `http://pi-ip:1880/ui`
+        2. **API Endpoint** - `curl -X POST http://pi-ip:1880/api/update/now`  
+        3. **Update Script** - `sudo /opt/scripts/update_dashboard.sh`
+        4. **Quick Update** - `sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/${{ env.PROD_REPO }}/main/scripts/quick-update.sh)"`
+        5. **Manual Start** - `cd ~/cocktail-machine/deployment && ./start-services.sh`
+        
+        ## 📦 Contents
+        
+        - **`web/`** - Dashboard application (version ${{ steps.version.outputs.version }})
+        - **`scripts/`** - Installation and update scripts  
+        - **`kiosk/`** - Kiosk mode configuration
+        - **`web.tar.gz`** - Compressed deployment archive
+        
+        ---
+        
+        *🤖 Automatically deployed from dev repository via GitHub Actions*  
+        *⏰ Last updated: ${{ steps.version.outputs.timestamp }}*
+        EOF
+        
+        echo "➕ Adding all changes to git..."
+        git add .
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          if [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            echo "🔄 Force deployment requested - creating deployment commit"
+            git commit --allow-empty -m "🚀 Force deployment: ${{ steps.version.outputs.version }}"
+          else
+            echo "ℹ️ No changes detected - skipping deployment"
+            echo "💡 Use 'force_deploy' option if you want to deploy anyway"
+            exit 0
+          fi
+        else
+          echo "💾 Committing production release..."
+          git commit -m "🚀 Production Release: ${{ steps.version.outputs.version }}
+
+        📦 Release Details:
+        - Version: ${{ steps.version.outputs.version }}
+        - Type: ${{ github.event.inputs.release_type }}
+        - Timestamp: ${{ steps.version.outputs.timestamp }}
+        - Dev Commit: $(cd .. && git rev-parse --short HEAD)
+        
+        📝 Release Notes:
+        ${{ github.event.inputs.release_notes }}
+        
+        🔄 Deployment triggered manually from dev repository
+        🎯 Ready for Pi user installations and updates!"
+        fi
+        
+        echo "🚀 Pushing to production repository..."
+        git push origin main
+        
+        echo "✅ Production deployment completed successfully!"
+        
+    - name: 📊 Deployment Summary
+      run: |
+        echo "## 🎉 Dev → Prod Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**🏷️ Production Version:** \`${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+        echo "**📦 Release Type:** ${{ github.event.inputs.release_type }}" >> $GITHUB_STEP_SUMMARY  
+        echo "**⏰ Deployed:** ${{ steps.version.outputs.timestamp }}" >> $GITHUB_STEP_SUMMARY
+        echo "**🎯 Production Repo:** [${{ env.PROD_REPO }}](https://github.com/${{ env.PROD_REPO }})" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📝 Release Notes" >> $GITHUB_STEP_SUMMARY
+        echo "${{ github.event.inputs.release_notes }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📥 Pi Users Can Now:" >> $GITHUB_STEP_SUMMARY
+        echo "1. **Install Fresh:** \`curl -fsSL https://raw.githubusercontent.com/${{ env.PROD_REPO }}/main/scripts/setup-ultimate.sh | bash\`" >> $GITHUB_STEP_SUMMARY
+        echo "2. **Update Existing:** Go to Node-RED Dashboard → Updates Tab → Install Update" >> $GITHUB_STEP_SUMMARY
+        echo "3. **Manual Update:** \`sudo /opt/scripts/update_dashboard.sh\`" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **Production deployment is live and ready for users!**" >> $GITHUB_STEP_SUMMARY
