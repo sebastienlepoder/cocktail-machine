@@ -502,7 +502,7 @@ EOF
     sudo bash -c 'echo -e "\n# Disable screen blanking\nconsoleblank=0" >> /boot/cmdline.txt' 2>/dev/null || true
     
     # Create a simple launcher script
-    cat > "$PROJECT_DIR/start-dashboard.sh" << 'EOF'
+    cat > "$PROJECT_DIR/start-dashboard.sh" << EOF
 #!/bin/bash
 # Manual launcher for Cocktail Machine Dashboard
 
