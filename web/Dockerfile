@@ -1,44 +1,41 @@
-FROM node:18-alpine AS base
+# Use official Node.js Alpine image
+FROM node:18-alpine
 
-# Install dependencies only when needed
-FROM base AS deps
+# Install dependencies
 RUN apk add --no-cache libc6-compat
+
+# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
+
+# Install dependencies
 RUN npm install
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy all application files
 COPY . .
 
-# Generate a basic Next.js build
+# Build the Next.js application
 RUN npm run build
 
-# Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nextjs -u 1001
 
-ENV NODE_ENV production
-# Disable telemetry during runtime.
-ENV NEXT_TELEMETRY_DISABLED 1
+# Set ownership of the app directory
+RUN chown -R nextjs:nodejs /app
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy the build output
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-
+# Switch to non-root user
 USER nextjs
 
+# Expose port
 EXPOSE 3000
 
+# Set environment variables
+ENV NODE_ENV production
 ENV PORT 3000
+ENV NEXT_TELEMETRY_DISABLED 1
 
+# Start the application
 CMD ["npm", "start"]
