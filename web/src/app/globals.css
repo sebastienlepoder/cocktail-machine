@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply backdrop-blur-sm bg-white/10 border border-white/20 rounded-xl shadow-xl;
+  }
+  
+  .bottle-card {
+    @apply glass-card p-6 transition-all duration-300 hover:bg-white/20 hover:scale-105;
+  }
+  
+  .level-indicator {
+    @apply relative w-full h-4 bg-gray-700 rounded-full overflow-hidden;
+  }
+  
+  .level-fill {
+    @apply absolute left-0 top-0 h-full transition-all duration-500 ease-out;
+  }
+}
+
+.level-high {
+  @apply bg-gradient-to-r from-green-400 to-green-500;
+}
+
+.level-medium {
+  @apply bg-gradient-to-r from-yellow-400 to-orange-500;
+}
+
+.level-low {
+  @apply bg-gradient-to-r from-orange-500 to-red-500;
+}
+
+.status-online {
+  @apply text-green-400;
+}
+
+.status-offline {
+  @apply text-red-400;
+}

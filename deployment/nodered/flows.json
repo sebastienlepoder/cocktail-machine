@@ -1,0 +1,138 @@
+[
+  {
+    "id": "flow1",
+    "label": "Cocktail Machine Control",
+    "nodes": [
+      {
+        "id": "mqtt-in-1",
+        "type": "mqtt in",
+        "z": "flow1",
+        "name": "Bottle Status",
+        "topic": "cocktail/module/+/status",
+        "qos": "0",
+        "broker": "broker1",
+        "x": 100,
+        "y": 100,
+        "wires": [["status-processor"]]
+      },
+      {
+        "id": "mqtt-in-2",
+        "type": "mqtt in", 
+        "z": "flow1",
+        "name": "Bottle Levels",
+        "topic": "cocktail/module/+/level",
+        "qos": "0",
+        "broker": "broker1",
+        "x": 100,
+        "y": 160,
+        "wires": [["level-processor"]]
+      },
+      {
+        "id": "status-processor",
+        "type": "function",
+        "z": "flow1",
+        "name": "Process Status",
+        "func": "// Process bottle status updates\nconst payload = JSON.parse(msg.payload);\nconst moduleId = payload.module_id;\n\n// Store in context for web dashboard\nconst bottles = flow.get('bottles') || {};\nbottles[moduleId] = {\n  ...bottles[moduleId],\n  status: payload.status,\n  wifi_connected: payload.wifi_connected,\n  mqtt_connected: payload.mqtt_connected,\n  ip_address: payload.ip_address,\n  last_seen: new Date().toISOString()\n};\n\nflow.set('bottles', bottles);\n\n// Forward to database storage\nmsg.table = 'bottle_status';\nmsg.payload = payload;\n\nreturn msg;",
+        "outputs": 1,
+        "x": 300,
+        "y": 100,
+        "wires": [["debug1"]]
+      },
+      {
+        "id": "level-processor", 
+        "type": "function",
+        "z": "flow1",
+        "name": "Process Levels",
+        "func": "// Process bottle level updates\nconst payload = JSON.parse(msg.payload);\nconst moduleId = payload.module_id;\n\n// Store in context\nconst bottles = flow.get('bottles') || {};\nbottles[moduleId] = {\n  ...bottles[moduleId],\n  level_percent: payload.level_percent,\n  level_ml: payload.level_ml,\n  last_level_update: new Date().toISOString()\n};\n\nflow.set('bottles', bottles);\n\n// Check for low level alerts\nif (payload.level_percent < 20) {\n  node.warn(`Low level alert: ${moduleId} at ${payload.level_percent}%`);\n  \n  // Send alert\n  const alertMsg = {\n    payload: {\n      type: 'low_level_alert',\n      module_id: moduleId,\n      level: payload.level_percent,\n      timestamp: new Date().toISOString()\n    },\n    topic: 'cocktail/alerts/low_level'\n  };\n  \n  node.send([msg, alertMsg]);\n  return;\n}\n\nreturn msg;",
+        "outputs": 1,
+        "x": 300,
+        "y": 160,
+        "wires": [["debug2"]]
+      },
+      {
+        "id": "recipe-handler",
+        "type": "http in",
+        "z": "flow1", 
+        "name": "Recipe API",
+        "url": "/api/recipe/execute",
+        "method": "post",
+        "x": 100,
+        "y": 300,
+        "wires": [["recipe-processor"]]
+      },
+      {
+        "id": "recipe-processor",
+        "type": "function",
+        "z": "flow1",
+        "name": "Execute Recipe",
+        "func": "// Execute cocktail recipe\nconst recipe = msg.payload;\nconst bottles = flow.get('bottles') || {};\n\n// Validate ingredients are available\nfor (const ingredient of recipe.ingredients) {\n  const bottle = bottles[ingredient.bottle_id];\n  if (!bottle || bottle.status !== 'online' || bottle.level_percent < 10) {\n    msg.statusCode = 400;\n    msg.payload = {\n      error: 'Ingredient unavailable',\n      ingredient: ingredient.bottle_id,\n      bottle_status: bottle?.status || 'unknown'\n    };\n    return msg;\n  }\n}\n\n// Calculate pump times based on amounts\nconst commands = [];\nfor (const ingredient of recipe.ingredients) {\n  const pumpTimeMs = (ingredient.amount / 10) * 1000; // 10ml/second\n  \n  commands.push({\n    topic: `cocktail/module/${ingredient.bottle_id}/pump/command`,\n    payload: JSON.stringify({\n      action: 'start',\n      duration_ms: pumpTimeMs,\n      speed: 255,\n      recipe_id: recipe.id,\n      timestamp: Date.now()\n    })\n  });\n}\n\n// Store recipe execution\nconst execution = {\n  recipe_id: recipe.id,\n  recipe_name: recipe.name,\n  ingredients: recipe.ingredients,\n  status: 'executing',\n  start_time: new Date().toISOString(),\n  commands: commands\n};\n\nflow.set('current_execution', execution);\n\n// Send pump commands\nmsg.payload = {\n  status: 'started',\n  recipe: recipe.name,\n  estimated_time: Math.max(...commands.map(c => JSON.parse(c.payload).duration_ms)) / 1000,\n  execution_id: execution.start_time\n};\n\n// Send commands to MQTT\nfor (const cmd of commands) {\n  node.send([null, cmd]);\n}\n\nreturn msg;",
+        "outputs": 2,
+        "x": 300,
+        "y": 300,
+        "wires": [["http-response"], ["mqtt-out"]]
+      },
+      {
+        "id": "http-response",
+        "type": "http response",
+        "z": "flow1",
+        "name": "API Response", 
+        "x": 500,
+        "y": 300,
+        "wires": []
+      },
+      {
+        "id": "mqtt-out",
+        "type": "mqtt out",
+        "z": "flow1",
+        "name": "Pump Commands",
+        "topic": "",
+        "qos": "0",
+        "retain": "false",
+        "broker": "broker1",
+        "x": 500,
+        "y": 360,
+        "wires": []
+      },
+      {
+        "id": "debug1",
+        "type": "debug",
+        "z": "flow1",
+        "name": "Status Debug",
+        "x": 500,
+        "y": 100,
+        "wires": []
+      },
+      {
+        "id": "debug2", 
+        "type": "debug",
+        "z": "flow1",
+        "name": "Level Debug",
+        "x": 500,
+        "y": 160,
+        "wires": []
+      }
+    ]
+  },
+  {
+    "id": "broker1",
+    "type": "mqtt-broker",
+    "name": "Cocktail MQTT",
+    "broker": "mosquitto",
+    "port": "1883",
+    "clientid": "nodered-cocktail",
+    "usetls": false,
+    "verifyservercert": true,
+    "compatmode": false,
+    "keepalive": "60",
+    "cleansession": true,
+    "birthTopic": "cocktail/nodered/status",
+    "birthQos": "0",
+    "birthPayload": "online",
+    "closeTopic": "cocktail/nodered/status", 
+    "closeQos": "0",
+    "closePayload": "offline",
+    "willTopic": "cocktail/nodered/status",
+    "willQos": "0",
+    "willPayload": "offline"
+  }
+]
