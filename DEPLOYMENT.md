@@ -19,9 +19,12 @@ The Cocktail Machine consists of:
 - Ethernet or WiFi connection
 - Power supply for Raspberry Pi and pumps
 
-### Software Requirements
-- Raspberry Pi OS (64-bit) Lite or Desktop
+### Software Requirements  
+- **Raspberry Pi OS (64-bit) Lite** - RECOMMENDED for kiosk mode
+- **Raspberry Pi OS (64-bit) Desktop** - Alternative if you need full desktop
 - Internet connection for initial setup
+
+> 💡 **Recommendation**: Use **Raspberry Pi OS Lite (64-bit)** for best kiosk performance. The setup script will install only the minimal desktop components needed.
 
 ## Quick Start Deployment
 
@@ -34,22 +37,31 @@ The Cocktail Machine consists of:
 
 ### 2. Run Automated Setup
 
-Connect to your Raspberry Pi via SSH or directly, then run:
+Connect to your Raspberry Pi via SSH or directly, then run the **Ultimate Setup Script**:
 
 ```bash
-# Download and run the setup script
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/deployment/setup-raspberry-pi.sh -o setup.sh
-chmod +x setup.sh
-./setup.sh
+# Download and run the ultimate kiosk setup script
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/deployment/setup-ultimate.sh -o setup-ultimate.sh
+chmod +x setup-ultimate.sh
+./setup-ultimate.sh
 ```
+
+> ⚠️ **Important**: Use `setup-ultimate.sh` instead of the basic setup script. This provides:
+> - Proper kiosk mode with loading screen
+> - Robust service health checking  
+> - Auto-login to desktop
+> - Quiet boot configuration
+> - Professional presentation mode
 
 This script will:
 - Install Docker and Docker Compose
-- Clone the repository
-- Set up all required directories
-- Create environment files
-- Configure auto-start services
-- Set up automatic backups
+- Install minimal X11 desktop environment (OpenBox + LightDM)
+- Clone the repository and set up directories
+- Create configuration files with health check endpoints
+- **Configure kiosk mode with professional loading screen**
+- **Set up auto-login and quiet boot**
+- **Create robust service health checking**
+- Configure auto-start services and backups
 
 ### 3. Configure Environment
 
@@ -65,12 +77,22 @@ SUPABASE_URL=your_actual_supabase_url
 SUPABASE_ANON_KEY=your_actual_anon_key
 ```
 
-### 4. Start Services
+### 4. Reboot to Kiosk Mode
+
+After configuration, reboot to start kiosk mode:
 
 ```bash
-cd /home/pi/cocktail-machine/deployment
-docker-compose up -d
+sudo reboot
 ```
+
+**What happens after reboot:**
+1. 🔇 **Silent boot** (no boot messages)
+2. 🖥️ **Auto-login** to desktop
+3. 🍹 **Loading screen** appears immediately  
+4. ⏳ **Service health check** runs in background
+5. 📱 **Dashboard** appears when services are ready
+
+> The services start automatically via systemd. No manual intervention needed!
 
 ### 5. Configure ESP32 Modules
 
@@ -124,10 +146,14 @@ docker-compose up -d
 
 Once deployed, access services at:
 
-- **Web Dashboard**: `http://<raspberry-pi-ip>:3000`
-- **Node-RED**: `http://<raspberry-pi-ip>:1880`
+- **Web Dashboard**: `http://<raspberry-pi-ip>` (port 80)
+- **Kiosk Display**: Automatically shown on connected screen
+- **Node-RED Admin**: `http://<raspberry-pi-ip>/admin`
 - **MQTT Broker**: `<raspberry-pi-ip>:1883`
 - **PostgreSQL**: `<raspberry-pi-ip>:5432`
+- **Health Check**: `http://<raspberry-pi-ip>/health`
+
+> 💡 The kiosk will automatically display the dashboard on the connected screen. For remote access, use the IP addresses above.
 
 ## ESP32 Module Setup
 
@@ -190,7 +216,65 @@ docker-compose down
 docker-compose up -d
 ```
 
-## Troubleshooting
+## Kiosk Mode Troubleshooting
+
+### Loading Screen Stuck
+
+If the loading screen never transitions to the dashboard:
+
+```bash
+# SSH into the Pi and check logs
+ssh pi@<raspberry-pi-ip>
+
+# View kiosk logs
+cat /tmp/kiosk-launcher.log
+cat /tmp/kiosk-service-check.log
+
+# Check if services are running
+cd /home/pi/cocktail-machine/deployment
+docker-compose ps
+
+# Manually test service health
+curl http://localhost/health
+```
+
+### Manual Kiosk Restart
+
+```bash
+# Kill browser and restart kiosk
+pkill -f chromium
+DISPLAY=:0 /home/pi/.cocktail-machine/kiosk-launcher.sh
+```
+
+### Boot Messages Still Showing
+
+If you still see boot messages:
+
+```bash
+# Check if quiet boot is configured
+cat /boot/cmdline.txt
+# Should contain: quiet splash plymouth.ignore-serial-consoles logo.nologo
+
+# If missing, run:
+sudo nano /boot/cmdline.txt
+# Add the quiet parameters manually
+```
+
+### Desktop Not Starting
+
+```bash
+# Check if graphical target is enabled
+sudo systemctl get-default
+# Should show: graphical.target
+
+# Check LightDM status
+sudo systemctl status lightdm
+
+# Check auto-login configuration
+cat /etc/lightdm/lightdm.conf.d/01-autologin.conf
+```
+
+## General Troubleshooting
 
 ### Services Not Starting
 
