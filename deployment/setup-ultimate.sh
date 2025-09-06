@@ -89,9 +89,9 @@ mkdir -p deployment/{mosquitto/{data,log},nodered/data,postgres/data,nginx/{site
 # Step 5: Create configuration files
 print_step "Step 5: Creating configuration files..."
 
-# Nginx config
-if [ ! -f deployment/nginx/nginx.conf ]; then
-    cat > deployment/nginx/nginx.conf << 'EOF'
+# Nginx config - Always create/update to ensure health endpoint exists
+print_info "Creating nginx configuration with health endpoint..."
+cat > deployment/nginx/nginx.conf << 'EOF'
 events {
     worker_connections 1024;
 }
@@ -130,7 +130,7 @@ http {
             proxy_cache_bypass $http_upgrade;
         }
         
-        # Health check endpoint
+        # Health check endpoint - CRITICAL for kiosk mode
         location /health {
             access_log off;
             return 200 "healthy\n";
@@ -147,7 +147,6 @@ http {
     }
 }
 EOF
-fi
 
 # Environment file
 if [ ! -f "deployment/.env" ]; then
