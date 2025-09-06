@@ -358,7 +358,7 @@ chmod +x /home/$USER/.cocktail-machine/wait-for-service.sh
 
 # Configure openbox autostart for kiosk mode (Official Raspberry Pi method)
 print_status "Configuring kiosk mode with professional loading screen..."
-cat > /home/$USER/.config/openbox/autostart << 'EOF'
+cat > /home/$USER/.config/openbox/autostart << EOF
 # Disable screen blanking
 xset s off
 xset -dpms
@@ -368,20 +368,20 @@ xset s noblank
 unclutter -idle 1 &
 
 # Show loading screen immediately
-chromium-browser --kiosk --noerrdialogs --disable-infobars \
-    --check-for-update-interval=604800 \
-    --disable-pinch \
-    --overscroll-history-navigation=0 \
-    --disable-translate \
-    --touch-events=enabled \
-    --enable-touch-drag-drop \
-    --enable-touch-editing \
-    --disable-features=TranslateUI \
-    --disable-session-crashed-bubble \
-    file:///home/pi/.cocktail-machine/loading.html &
+chromium-browser --kiosk --noerrdialogs --disable-infobars \\
+    --check-for-update-interval=604800 \\
+    --disable-pinch \\
+    --overscroll-history-navigation=0 \\
+    --disable-translate \\
+    --touch-events=enabled \\
+    --enable-touch-drag-drop \\
+    --enable-touch-editing \\
+    --disable-features=TranslateUI \\
+    --disable-session-crashed-bubble \\
+    file:///home/$USER/.cocktail-machine/loading.html &
 
 # Wait for service and replace loading screen with dashboard
-/home/pi/.cocktail-machine/wait-for-service.sh &
+/home/$USER/.cocktail-machine/wait-for-service.sh &
 EOF
 
 # Set proper permissions
@@ -399,13 +399,20 @@ sudo systemctl set-default graphical.target
 
 # Configure quiet boot for professional appearance
 print_status "Configuring quiet boot for professional appearance..."
-# Disable boot messages
+# Disable boot messages (works for both /boot/cmdline.txt and /boot/firmware/cmdline.txt)
+CMDLINE_FILE=""
 if [ -f /boot/cmdline.txt ]; then
+    CMDLINE_FILE="/boot/cmdline.txt"
+elif [ -f /boot/firmware/cmdline.txt ]; then
+    CMDLINE_FILE="/boot/firmware/cmdline.txt"
+fi
+
+if [ -n "$CMDLINE_FILE" ]; then
     # Backup original
-    sudo cp /boot/cmdline.txt /boot/cmdline.txt.backup
+    sudo cp "$CMDLINE_FILE" "${CMDLINE_FILE}.backup"
     # Add quiet splash if not already present
-    if ! grep -q "quiet" /boot/cmdline.txt; then
-        sudo sed -i 's/$/ quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0/' /boot/cmdline.txt
+    if ! grep -q "quiet" "$CMDLINE_FILE"; then
+        sudo sed -i 's/$/ quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0/' "$CMDLINE_FILE"
     fi
 fi
 
