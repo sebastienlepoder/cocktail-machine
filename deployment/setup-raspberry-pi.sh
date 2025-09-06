@@ -16,6 +16,34 @@ if [ -f /etc/needrestart/needrestart.conf ]; then
     sudo sed -i "s/#\$nrconf{kernelhints} = -1;/\$nrconf{kernelhints} = -1;/g" /etc/needrestart/needrestart.conf
 fi
 
+# Configure auto-login for console
+print_status "Configuring auto-login..."
+# Method 1: Using raspi-config (most reliable)
+if command -v raspi-config &> /dev/null; then
+    print_status "Setting auto-login with raspi-config..."
+    # B2 = Console auto-login
+    sudo raspi-config nonint do_boot_behaviour B2
+fi
+
+# Method 2: Systemd service override (backup method)
+print_status "Configuring systemd auto-login..."
+sudo mkdir -p /etc/systemd/system/getty@tty1.service.d/
+sudo bash -c "cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf" << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin $USER --noclear %I \$TERM
+Type=idle
+EOF
+
+# Method 3: For systems using lightdm
+if [ -f /etc/lightdm/lightdm.conf ]; then
+    print_status "Configuring LightDM auto-login..."
+    sudo sed -i "s/^#autologin-user=.*/autologin-user=$USER/" /etc/lightdm/lightdm.conf 2>/dev/null || 
+    echo "autologin-user=$USER" | sudo tee -a /etc/lightdm/lightdm.conf
+fi
+
+sudo systemctl daemon-reload
+
 echo "========================================="
 echo "Cocktail Machine - Raspberry Pi Setup"
 echo "========================================="
@@ -592,6 +620,25 @@ EOF
     sudo systemctl enable cocktail-kiosk.service
     
     print_status "Kiosk mode configured! Dashboard will display on screen at startup."
+    
+    # Add auto-start to bashrc for console login
+    if ! grep -q "start-kiosk" /home/$USER/.bashrc; then
+        print_status "Adding kiosk auto-start to bashrc..."
+        cat >> /home/$USER/.bashrc << 'EOF'
+
+# Auto-start Cocktail Machine Dashboard
+if [ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ]; then
+    echo "Starting Cocktail Machine Dashboard..."
+    if [ -f /home/pi/cocktail-machine/start-kiosk.sh ]; then
+        exec /home/pi/cocktail-machine/start-kiosk.sh
+    elif [ -f /home/pi/cocktail-machine/kiosk.sh ]; then
+        exec startx /home/pi/cocktail-machine/kiosk.sh 2>/dev/null || 
+             sudo startx /home/pi/cocktail-machine/kiosk.sh
+    fi
+fi
+EOF
+    fi
+    
     print_info "The system will reboot into kiosk mode."
 else
     print_info "Chromium browser not available. Please install a desktop environment."
