@@ -317,17 +317,37 @@ cat > /home/$USER/.cocktail-machine/wait-for-service.sh << 'SCRIPT'
 
 echo "Waiting for cocktail machine services to start..."
 
+# Show loading screen immediately
+chromium-browser --kiosk --noerrdialogs --disable-infobars \
+    --check-for-update-interval=604800 \
+    --disable-pinch \
+    --overscroll-history-navigation=0 \
+    --disable-translate \
+    --touch-events=enabled \
+    --enable-touch-drag-drop \
+    --enable-touch-editing \
+    --disable-features=TranslateUI \
+    --disable-session-crashed-bubble \
+    --disable-component-update \
+    --autoplay-policy=no-user-gesture-required \
+    "file:///home/${USER}/.cocktail-machine/loading.html" &
+
+BROWSER_PID=$!
+
 # Maximum wait time (5 minutes)
 MAX_WAIT=300
 WAITED=0
 
 # First wait a bit for Docker to start
-sleep 10
+sleep 15
 
 while [ $WAITED -lt $MAX_WAIT ]; do
     # Check if the service responds
     if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\|302"; then
         echo "Dashboard is ready!"
+        # Kill the loading screen browser
+        kill $BROWSER_PID 2>/dev/null || true
+        sleep 1
         # Start Chromium with the dashboard
         chromium-browser --kiosk --noerrdialogs --disable-infobars \
             --check-for-update-interval=604800 \
@@ -339,6 +359,8 @@ while [ $WAITED -lt $MAX_WAIT ]; do
             --enable-touch-editing \
             --disable-features=TranslateUI \
             --disable-session-crashed-bubble \
+            --disable-component-update \
+            --autoplay-policy=no-user-gesture-required \
             http://localhost:3000 &
         exit 0
     fi
@@ -349,9 +371,10 @@ while [ $WAITED -lt $MAX_WAIT ]; do
 done
 
 echo "Service failed to start after $MAX_WAIT seconds"
-# Show error page
+# Kill loading screen and show error page
+kill $BROWSER_PID 2>/dev/null || true
 chromium-browser --kiosk --noerrdialogs --disable-infobars \
-    "data:text/html,<html><body style='background:#f44336;color:white;display:flex;align-items:center;justify-center;height:100vh;font-family:sans-serif;'><div style='text-align:center;'><h1>Service Failed to Start</h1><p>Please check the system logs</p></div></body></html>" &
+    "data:text/html,<html><body style='background:#f44336;color:white;display:flex;align-items:center;justify-center:center;height:100vh;font-family:sans-serif;'><div style='text-align:center;'><h1>Service Failed to Start</h1><p>Please check the system logs</p></div></body></html>" &
 SCRIPT
 
 chmod +x /home/$USER/.cocktail-machine/wait-for-service.sh
@@ -367,20 +390,7 @@ xset s noblank
 # Hide mouse cursor after 1 second
 unclutter -idle 1 &
 
-# Show loading screen immediately
-chromium-browser --kiosk --noerrdialogs --disable-infobars \\
-    --check-for-update-interval=604800 \\
-    --disable-pinch \\
-    --overscroll-history-navigation=0 \\
-    --disable-translate \\
-    --touch-events=enabled \\
-    --enable-touch-drag-drop \\
-    --enable-touch-editing \\
-    --disable-features=TranslateUI \\
-    --disable-session-crashed-bubble \\
-    file:///home/$USER/.cocktail-machine/loading.html &
-
-# Wait for service and replace loading screen with dashboard
+# Start the kiosk with loading screen and service check
 /home/$USER/.cocktail-machine/wait-for-service.sh &
 EOF
 
@@ -456,6 +466,35 @@ EOF
 print_status "Enabling auto-start service..."
 sudo systemctl daemon-reload
 sudo systemctl enable cocktail-machine.service
+
+# Create systemd service for kiosk display
+print_status "Creating kiosk display service..."
+sudo tee /etc/systemd/system/cocktail-kiosk.service > /dev/null << EOF
+[Unit]
+Description=Cocktail Machine Kiosk Display
+After=graphical.target cocktail-machine.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=$USER
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/$USER/.Xauthority"
+ExecStartPre=/bin/sleep 10
+ExecStart=/home/$USER/.cocktail-machine/wait-for-service.sh
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+# Enable kiosk service
+print_status "Enabling kiosk display service..."
+sudo systemctl daemon-reload
+sudo systemctl enable cocktail-kiosk.service
 
 # Configure firewall (if ufw is installed)
 if command -v ufw &> /dev/null; then
