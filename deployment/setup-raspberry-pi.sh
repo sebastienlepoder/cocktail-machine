@@ -311,28 +311,28 @@ HTML
 
 # Create service health check script
 print_status "Creating service health check script..."
-cat > /home/$USER/.cocktail-machine/wait-for-service.sh << 'SCRIPT'
+cat > /home/$USER/.cocktail-machine/wait-for-service.sh << SCRIPT
 #!/bin/bash
 # Wait for the web dashboard to be ready
 
 echo "Waiting for cocktail machine services to start..."
 
 # Show loading screen immediately
-chromium-browser --kiosk --noerrdialogs --disable-infobars \
-    --check-for-update-interval=604800 \
-    --disable-pinch \
-    --overscroll-history-navigation=0 \
-    --disable-translate \
-    --touch-events=enabled \
-    --enable-touch-drag-drop \
-    --enable-touch-editing \
-    --disable-features=TranslateUI \
-    --disable-session-crashed-bubble \
-    --disable-component-update \
-    --autoplay-policy=no-user-gesture-required \
-    "file:///home/${USER}/.cocktail-machine/loading.html" &
+chromium-browser --kiosk --noerrdialogs --disable-infobars \\
+    --check-for-update-interval=604800 \\
+    --disable-pinch \\
+    --overscroll-history-navigation=0 \\
+    --disable-translate \\
+    --touch-events=enabled \\
+    --enable-touch-drag-drop \\
+    --enable-touch-editing \\
+    --disable-features=TranslateUI \\
+    --disable-session-crashed-bubble \\
+    --disable-component-update \\
+    --autoplay-policy=no-user-gesture-required \\
+    "file:///home/$USER/.cocktail-machine/loading.html" &
 
-BROWSER_PID=$!
+BROWSER_PID=\$!
 
 # Maximum wait time (5 minutes)
 MAX_WAIT=300
@@ -341,43 +341,93 @@ WAITED=0
 # First wait a bit for Docker to start
 sleep 15
 
-while [ $WAITED -lt $MAX_WAIT ]; do
+while [ \$WAITED -lt \$MAX_WAIT ]; do
     # Check if the service responds
-    if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\|302"; then
+    if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 | grep -q "200\\|302"; then
         echo "Dashboard is ready!"
         # Kill the loading screen browser
-        kill $BROWSER_PID 2>/dev/null || true
+        kill \$BROWSER_PID 2>/dev/null || true
         sleep 1
         # Start Chromium with the dashboard
-        chromium-browser --kiosk --noerrdialogs --disable-infobars \
-            --check-for-update-interval=604800 \
-            --disable-pinch \
-            --overscroll-history-navigation=0 \
-            --disable-translate \
-            --touch-events=enabled \
-            --enable-touch-drag-drop \
-            --enable-touch-editing \
-            --disable-features=TranslateUI \
-            --disable-session-crashed-bubble \
-            --disable-component-update \
-            --autoplay-policy=no-user-gesture-required \
+        chromium-browser --kiosk --noerrdialogs --disable-infobars \\
+            --check-for-update-interval=604800 \\
+            --disable-pinch \\
+            --overscroll-history-navigation=0 \\
+            --disable-translate \\
+            --touch-events=enabled \\
+            --enable-touch-drag-drop \\
+            --enable-touch-editing \\
+            --disable-features=TranslateUI \\
+            --disable-session-crashed-bubble \\
+            --disable-component-update \\
+            --autoplay-policy=no-user-gesture-required \\
             http://localhost:3000 &
         exit 0
     fi
     
     echo "Service not ready yet. Waiting..."
     sleep 5
-    WAITED=$((WAITED + 5))
+    WAITED=\$((WAITED + 5))
 done
 
-echo "Service failed to start after $MAX_WAIT seconds"
+echo "Service failed to start after \$MAX_WAIT seconds"
 # Kill loading screen and show error page
-kill $BROWSER_PID 2>/dev/null || true
-chromium-browser --kiosk --noerrdialogs --disable-infobars \
+kill \$BROWSER_PID 2>/dev/null || true
+chromium-browser --kiosk --noerrdialogs --disable-infobars \\
     "data:text/html,<html><body style='background:#f44336;color:white;display:flex;align-items:center;justify-center:center;height:100vh;font-family:sans-serif;'><div style='text-align:center;'><h1>Service Failed to Start</h1><p>Please check the system logs</p></div></body></html>" &
 SCRIPT
 
 chmod +x /home/$USER/.cocktail-machine/wait-for-service.sh
+
+# Also create a simple alternative kiosk script for debugging
+print_status "Creating alternative simple kiosk script..."
+cat > /home/$USER/.cocktail-machine/simple-kiosk.sh << 'SIMPLESCRIPT'
+#!/bin/bash
+# Simple kiosk script with logging
+
+log_msg() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> /tmp/kiosk.log
+}
+
+log_msg "Starting kiosk..."
+export DISPLAY=:0
+pkill -f chromium 2>/dev/null
+sleep 2
+
+# Show loading screen
+log_msg "Showing loading screen..."
+chromium-browser --kiosk --noerrdialogs --disable-infobars \
+    "file://$HOME/.cocktail-machine/loading.html" &
+LOADING_PID=$!
+
+# Wait for service
+MAX_WAIT=300
+WAITED=0
+sleep 20
+
+while [ $WAITED -lt $MAX_WAIT ]; do
+    log_msg "Checking service (waited: $WAITED)..."
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 2>/dev/null)
+    
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ]; then
+        log_msg "Service ready! HTTP: $HTTP_CODE"
+        kill $LOADING_PID 2>/dev/null
+        sleep 2
+        chromium-browser --kiosk --noerrdialogs --disable-infobars \
+            "http://localhost:3000" &
+        log_msg "Dashboard launched!"
+        exit 0
+    fi
+    
+    sleep 5
+    WAITED=$((WAITED + 5))
+done
+
+log_msg "Service failed to start"
+kill $LOADING_PID 2>/dev/null
+SIMPLESCRIPT
+
+chmod +x /home/$USER/.cocktail-machine/simple-kiosk.sh
 
 # Configure openbox autostart for kiosk mode (Official Raspberry Pi method)
 print_status "Configuring kiosk mode with professional loading screen..."
@@ -390,8 +440,8 @@ xset s noblank
 # Hide mouse cursor after 1 second
 unclutter -idle 1 &
 
-# Start the kiosk with loading screen and service check
-/home/$USER/.cocktail-machine/wait-for-service.sh &
+# Start the kiosk with loading screen and service check (using simple script)
+/home/$USER/.cocktail-machine/simple-kiosk.sh &
 EOF
 
 # Set proper permissions
@@ -419,11 +469,22 @@ fi
 
 if [ -n "$CMDLINE_FILE" ]; then
     # Backup original
-    sudo cp "$CMDLINE_FILE" "${CMDLINE_FILE}.backup"
-    # Add quiet splash if not already present
-    if ! grep -q "quiet" "$CMDLINE_FILE"; then
-        sudo sed -i 's/$/ quiet splash loglevel=0 logo.nologo vt.global_cursor_default=0/' "$CMDLINE_FILE"
-    fi
+    sudo cp "$CMDLINE_FILE" "${CMDLINE_FILE}.backup" 2>/dev/null || true
+    
+    # Read current cmdline
+    CURRENT_CMDLINE=$(cat "$CMDLINE_FILE")
+    
+    # Add quiet boot parameters if not already present
+    QUIET_PARAMS="quiet splash plymouth.ignore-serial-consoles logo.nologo vt.global_cursor_default=0 loglevel=0 systemd.show_status=0"
+    
+    for param in $QUIET_PARAMS; do
+        if ! echo "$CURRENT_CMDLINE" | grep -q "$param"; then
+            CURRENT_CMDLINE="$CURRENT_CMDLINE $param"
+        fi
+    done
+    
+    # Write back the modified cmdline
+    echo "$CURRENT_CMDLINE" | sudo tee "$CMDLINE_FILE" > /dev/null
 fi
 
 # Disable Plymouth boot messages (if installed)
@@ -436,6 +497,28 @@ sudo bash -c 'echo "FSCKFIX=yes" >> /etc/default/rcS' 2>/dev/null || true
 
 # Disable systemd boot messages
 sudo bash -c 'echo "ShowStatus=no" >> /etc/systemd/system.conf' 2>/dev/null || true
+
+# Disable getty service messages
+sudo systemctl mask getty@tty1.service 2>/dev/null || true
+
+# Configure config.txt for quiet boot (Raspberry Pi specific)
+CONFIG_FILE=""
+if [ -f /boot/config.txt ]; then
+    CONFIG_FILE="/boot/config.txt"
+elif [ -f /boot/firmware/config.txt ]; then
+    CONFIG_FILE="/boot/firmware/config.txt"
+fi
+
+if [ -n "$CONFIG_FILE" ]; then
+    # Add disable_splash if not present
+    if ! grep -q "disable_splash" "$CONFIG_FILE"; then
+        echo "disable_splash=1" | sudo tee -a "$CONFIG_FILE" > /dev/null
+    fi
+    # Disable boot delay
+    if ! grep -q "boot_delay" "$CONFIG_FILE"; then
+        echo "boot_delay=0" | sudo tee -a "$CONFIG_FILE" > /dev/null
+    fi
+fi
 
 print_status "Kiosk mode configured! Dashboard will display on screen at startup."
 
