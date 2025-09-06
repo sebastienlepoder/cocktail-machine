@@ -82,17 +82,20 @@ jobs:
         mkdir -p deploy/kiosk
         
         # Copy built web files
-        if [ -d web/dist ]; then
+        if [ -d web/dist ] && [ "$(ls -A web/dist 2>/dev/null)" ]; then
           cp -r web/dist/* deploy/web/
-        elif [ -d web/build ]; then
+        elif [ -d web/build ] && [ "$(ls -A web/build 2>/dev/null)" ]; then
           cp -r web/build/* deploy/web/
-        elif [ -d web/out ]; then
+        elif [ -d web/out ] && [ "$(ls -A web/out 2>/dev/null)" ]; then
           cp -r web/out/* deploy/web/
-        elif [ -d web/public ]; then
+        elif [ -d web/public ] && [ "$(ls -A web/public 2>/dev/null)" ]; then
           cp -r web/public/* deploy/web/
-        else
+        elif [ -d web ] && [ "$(ls -A web 2>/dev/null)" ]; then
           echo "No built web files found, copying source"
-          [ -d web ] && cp -r web/* deploy/web/ || echo "No web directory"
+          cp -r web/* deploy/web/
+        else
+          echo "No web directory or files found, creating placeholder"
+          echo "<!DOCTYPE html><html><head><title>Cocktail Machine</title></head><body><h1>🍹 Cocktail Machine</h1><p>Dashboard will be available soon</p></body></html>" > deploy/web/index.html
         fi
         
         # Copy additional web resources if they exist
