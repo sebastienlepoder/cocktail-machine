@@ -119,6 +119,62 @@ mkdir -p deployment/nginx/sites
 mkdir -p deployment/nginx/ssl
 mkdir -p deployment/web/public
 
+# Create nginx configuration if it doesn't exist
+if [ ! -f deployment/nginx/nginx.conf ]; then
+    print_status "Creating nginx configuration..."
+    cat > deployment/nginx/nginx.conf << 'EOF'
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream dashboard {
+        server web-dashboard:3000;
+    }
+    
+    upstream nodered {
+        server nodered:1880;
+    }
+    
+    server {
+        listen 80;
+        server_name _;
+        
+        # Main dashboard
+        location / {
+            proxy_pass http://dashboard;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+        
+        # Node-RED admin
+        location /admin {
+            proxy_pass http://nodered;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_cache_bypass $http_upgrade;
+        }
+        
+        # WebSocket support
+        location /ws {
+            proxy_pass http://dashboard;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+        }
+    }
+}
+EOF
+fi
+
 # Set permissions
 print_status "Setting permissions..."
 sudo chown -R 1883:1883 deployment/mosquitto/ 2>/dev/null || true
