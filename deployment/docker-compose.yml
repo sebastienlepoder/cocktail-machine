@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # MQTT Broker for ESP32 communication
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: cocktail-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - cocktail-network
+
+  # Node-RED for business logic and automation
+  nodered:
+    image: nodered/node-red:latest
+    container_name: cocktail-nodered
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    environment:
+      - TZ=Europe/Paris
+      - NODE_RED_ENABLE_PROJECTS=true
+    volumes:
+      - ./nodered/data:/data
+      - ./nodered/flows:/flows
+    networks:
+      - cocktail-network
+    depends_on:
+      - mosquitto
+      - postgres
+
+  # PostgreSQL database for Supabase
+  postgres:
+    image: postgres:15-alpine
+    container_name: cocktail-db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: cocktail_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeThisPassword123!}
+      POSTGRES_DB: cocktail_machine
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    networks:
+      - cocktail-network
+
+  # Web Dashboard (Next.js/React app)
+  web-dashboard:
+    build:
+      context: ../web
+      dockerfile: Dockerfile
+    container_name: cocktail-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://cocktail_admin:${DB_PASSWORD:-changeThisPassword123!}@postgres:5432/cocktail_machine
+      - NEXT_PUBLIC_SUPABASE_URL=${SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+    volumes:
+      - ./web/public:/app/public
+    networks:
+      - cocktail-network
+    depends_on:
+      - postgres
+
+  # Nginx reverse proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    container_name: cocktail-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/sites:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+    networks:
+      - cocktail-network
+    depends_on:
+      - web-dashboard
+      - nodered
+
+  # Auto-updater service
+  updater:
+    build:
+      context: ./updater
+      dockerfile: Dockerfile
+    container_name: cocktail-updater
+    restart: unless-stopped
+    environment:
+      - GIT_REPO=https://github.com/sebastienlepoder/cocktail-machine.git
+      - UPDATE_INTERVAL=3600  # Check for updates every hour
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/deployment
+      - ../:/app
+    networks:
+      - cocktail-network
+
+networks:
+  cocktail-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  nodered-data:
+  mosquitto-data:
