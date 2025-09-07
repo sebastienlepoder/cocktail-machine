@@ -1,31 +1,31 @@
 {
-  "name": "cocktail-machine-dashboard",
-  "version": "1.0.0",
-  "description": "Web dashboard for cocktail machine control and monitoring",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "type-check": "tsc --noEmit"
-  },
-  "dependencies": {
-    "next": "^14.0.0",
-    "react": "^18.0.0",
-    "react-dom": "^18.0.0",
-    "@supabase/supabase-js": "^2.38.0",
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.0.0",
-    "@types/react-dom": "^18.0.0",
-    "typescript": "^5.0.0",
-    "tailwindcss": "^3.3.0",
-    "autoprefixer": "^10.4.0",
-    "postcss": "^8.4.0",
-    "lucide-react": "^0.263.0",
-    "mqtt": "^5.0.0"
-  },
-  "devDependencies": {
-    "eslint": "^8.57.0",
-    "eslint-config-next": "^14.0.0"
-  }
+    "name":  "cocktail-machine-dashboard",
+    "version":  "1.0.5",
+    "description":  "Web dashboard for cocktail machine control and monitoring",
+    "scripts":  {
+                    "dev":  "next dev",
+                    "build":  "next build",
+                    "start":  "next start",
+                    "lint":  "next lint",
+                    "type-check":  "tsc --noEmit"
+                },
+    "dependencies":  {
+                         "next":  "^14.0.0",
+                         "react":  "^18.0.0",
+                         "react-dom":  "^18.0.0",
+                         "@supabase/supabase-js":  "^2.38.0",
+                         "@types/node":  "^20.0.0",
+                         "@types/react":  "^18.0.0",
+                         "@types/react-dom":  "^18.0.0",
+                         "typescript":  "^5.0.0",
+                         "tailwindcss":  "^3.3.0",
+                         "autoprefixer":  "^10.4.0",
+                         "postcss":  "^8.4.0",
+                         "lucide-react":  "^0.263.0",
+                         "mqtt":  "^5.0.0"
+                     },
+    "devDependencies":  {
+                            "eslint":  "^8.57.0",
+                            "eslint-config-next":  "^14.0.0"
+                        }
 }

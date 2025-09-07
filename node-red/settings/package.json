@@ -1,17 +1,17 @@
 {
-  "name": "cocktail-machine-nodered",
-  "version": "1.0.0",
-  "description": "Node-RED flows and settings for Cocktail Machine",
-  "dependencies": {
-    "node-red-dashboard": "^3.6.0",
-    "node-red-contrib-influxdb": "^0.6.1",
-    "node-red-contrib-ui-level": "^0.1.7",
-    "node-red-contrib-throttle": "^0.1.1"
-  },
-  "keywords": [
-    "node-red",
-    "cocktail-machine",
-    "iot",
-    "mqtt"
-  ]
+    "name":  "cocktail-machine-nodered",
+    "version":  "1.0.5",
+    "description":  "Node-RED flows and settings for Cocktail Machine",
+    "dependencies":  {
+                         "node-red-dashboard":  "^3.6.0",
+                         "node-red-contrib-influxdb":  "^0.6.1",
+                         "node-red-contrib-ui-level":  "^0.1.7",
+                         "node-red-contrib-throttle":  "^0.1.1"
+                     },
+    "keywords":  [
+                     "node-red",
+                     "cocktail-machine",
+                     "iot",
+                     "mqtt"
+                 ]
 }
