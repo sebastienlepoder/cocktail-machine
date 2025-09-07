@@ -48,11 +48,11 @@ esptool.py --chip esp32s3 --port COM3 write_flash 0x0 firmware.bin
 ### Raspberry Pi Deployment
 ```bash
 # Clone repository on Raspberry Pi
-git clone https://github.com/sebastienlepoder/cocktail-machine.git
-cd cocktail-machine/deployment
+git clone https://github.com/sebastienlepoder/cocktail-machine-dev.git
+cd cocktail-machine-dev/deployment
 
 # Run automated setup
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/setup-ultimate.sh | bash
 
 # Start all services
 docker-compose up -d

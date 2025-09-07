@@ -5,7 +5,7 @@
 
 echo "=== Nginx Health Endpoint Fix ==="
 
-cd /home/pi/cocktail-machine/deployment
+cd /home/pi/cocktail-machine-dev/deployment
 
 # Backup current config
 echo "Backing up current nginx config..."
@@ -90,7 +90,7 @@ if [ "$HEALTH_RESPONSE" = "healthy" ]; then
     pkill -f chromium 2>/dev/null || true
     sleep 2
     
-    DISPLAY=:0 /home/pi/.cocktail-machine/kiosk-launcher.sh &
+    DISPLAY=:0 /home/pi/.cocktail-machine-dev/kiosk-launcher.sh &
     echo "✅ Kiosk restarted - loading screen should transition to dashboard soon!"
     
 else

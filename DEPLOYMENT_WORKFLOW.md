@@ -138,13 +138,13 @@ gh run list --workflow="deploy-dashboard.yml" --limit 1
 gh run view --log
 
 # Check deployment was successful
-curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/VERSION
+curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/VERSION
 ```
 
 ### **Step 5: Verify Pi Users Can Update**
 ```bash
 # Test the update API endpoint
-curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json
+curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/versions.json
 
 # The Node-RED update system will automatically:
 # ✅ Check for new version every 10 minutes
@@ -171,13 +171,13 @@ gh run view WORKFLOW_ID
 ### **Check What Was Deployed:**
 ```bash
 # See current deployed version
-curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/VERSION
+curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/VERSION
 
 # See deployment details  
-curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json | jq
+curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/versions.json | jq
 
 # List all deployed files
-curl -s https://api.github.com/repos/sebastienlepoder/cocktail-deploy/contents | jq '.[].name'
+curl -s https://api.github.com/repos/sebastienlepoder/cocktail-machine-prod/contents | jq '.[].name'
 ```
 
 ---
@@ -238,10 +238,10 @@ gh run view --log-failed
 ### **Deployment Succeeded but Pi Users Can't Update:**
 ```bash
 # Check deployed version
-curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json
+curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/versions.json
 
 # Check Pi can reach deployment repo
-ssh pi@your-pi-ip "curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/VERSION"
+ssh pi@your-pi-ip "curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/VERSION"
 
 # Check Node-RED update system
 ssh pi@your-pi-ip "curl http://localhost:1880/api/update/status"
@@ -270,14 +270,14 @@ git push origin main  # This triggers new deployment with rollback
 gh run list --workflow="deploy-dashboard.yml" --limit 20
 
 # See deployment repository commits
-cd /path/to/cocktail-deploy
+cd /path/to/cocktail-machine-prod
 git log --oneline --graph
 ```
 
 ### **Track Version Changes:**
 ```bash
 # See version progression
-cd /path/to/cocktail-deploy
+cd /path/to/cocktail-machine-prod
 git log --oneline web/VERSION
 
 # Compare versions

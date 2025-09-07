@@ -19,7 +19,7 @@ The easiest way to update your cocktail machine dashboard:
 If you prefer the command line, SSH to your Pi and run:
 
 ```bash
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/quick-update.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/quick-update.sh)"
 ```
 
 That's it! ✨

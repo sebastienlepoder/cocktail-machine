@@ -30,7 +30,7 @@ chromium-browser \
     --disable-session-crashed-bubble \
     --disable-component-update \
     --autoplay-policy=no-user-gesture-required \
-    "file:///home/$USER/.cocktail-machine/loading.html" &
+    "file:///home/$USER/.cocktail-machine-dev/loading.html" &
 
 BROWSER_PID=$!
 

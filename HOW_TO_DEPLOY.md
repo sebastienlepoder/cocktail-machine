@@ -6,7 +6,7 @@
 
 ## 🎯 **When to Deploy to Production**
 
-Deploy when your dev repo (`cocktail-machine`) is ready for Pi users:
+Deploy when your dev repo (`cocktail-machine-dev`) is ready for Pi users:
 
 - ✅ **Features tested** and working locally
 - ✅ **Web dashboard** functional (if updated)  
@@ -19,7 +19,7 @@ Deploy when your dev repo (`cocktail-machine`) is ready for Pi users:
 ## 📋 **3-Step Deployment Process**
 
 ### **Step 1: Go to GitHub Actions**
-1. Open your browser to: https://github.com/sebastienlepoder/cocktail-machine
+1. Open your browser to: https://github.com/sebastienlepoder/cocktail-machine-dev
 2. Click **Actions** tab
 3. Click **"🚀 Dev → Prod Deployment"** workflow
 
@@ -56,7 +56,7 @@ Force deployment: ☐ (unchecked)
 1. **📥 Grabs** your latest dev code  
 2. **🔨 Builds** web dashboard (if needed)
 3. **📦 Creates** production package with version number
-4. **🚀 Deploys** to `cocktail-deploy` repository  
+4. **🚀 Deploys** to `cocktail-machine-prod` repository  
 5. **📢 Notifies** Pi users automatically
 6. **📊 Shows** deployment summary
 
@@ -76,7 +76,7 @@ Your production releases get automatic version numbers:
 
 ### **Verify Success:**
 - Green checkmark ✅ in Actions tab
-- New files appear in [`cocktail-deploy`](https://github.com/sebastienlepoder/cocktail-deploy) repo
+- New files appear in [`cocktail-machine-prod`](https://github.com/sebastienlepoder/cocktail-machine-prod) repo
 - Version number updated in `web/VERSION`
 
 ### **Pi Users Can:**
@@ -112,7 +112,7 @@ For critical fixes:
 
 ### **Pi Users Not Getting Updates:**
 - Verify deployment succeeded (green checkmark)
-- Check [`cocktail-deploy`](https://github.com/sebastienlepoder/cocktail-deploy) repo has new files
+- Check [`cocktail-machine-prod`](https://github.com/sebastienlepoder/cocktail-machine-prod) repo has new files
 - Pi users need internet connection for update notifications
 
 ---

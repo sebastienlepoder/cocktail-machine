@@ -99,7 +99,7 @@ services:
     container_name: cocktail-updater
     restart: unless-stopped
     environment:
-      - GIT_REPO=https://github.com/sebastienlepoder/cocktail-machine.git
+      - GIT_REPO=https://github.com/sebastienlepoder/cocktail-machine-dev.git
       - UPDATE_INTERVAL=3600  # Check for updates every hour
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

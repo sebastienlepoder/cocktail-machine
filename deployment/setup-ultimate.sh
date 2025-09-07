@@ -400,7 +400,7 @@ print_step "Step 6: Configuring nginx..."
 sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 
 # Create nginx config for React dashboard
-sudo tee /etc/nginx/sites-available/cocktail-machine > /dev/null << EOF
+sudo tee /etc/nginx/sites-available/cocktail-machine-dev > /dev/null << EOF
 server {
     listen 80;
     server_name _;
@@ -426,7 +426,7 @@ server {
 EOF
 
 # Enable the site
-sudo ln -sf /etc/nginx/sites-available/cocktail-machine /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/cocktail-machine-dev /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Test nginx config and restart
@@ -455,7 +455,7 @@ print_status "Nginx configuration completed"
 print_step "Step 7: Setting up backend services..."
 
 # Create project directory
-PROJECT_DIR="/home/$USER/cocktail-machine"
+PROJECT_DIR="/home/$USER/cocktail-machine-dev"
 mkdir -p "$PROJECT_DIR"
 
 # Create simple docker-compose for backend services only
@@ -710,10 +710,10 @@ print_status "Web-only setup completed - no desktop environment needed"
 print_step "Step 9: Creating simple kiosk startup..."
 
 # Create kiosk directory
-mkdir -p /home/$USER/.cocktail-machine
+mkdir -p /home/$USER/.cocktail-machine-dev
 
 # Create improved kiosk script
-cat > /home/$USER/.cocktail-machine/start-kiosk.sh << 'KIOSK_EOF'
+cat > /home/$USER/.cocktail-machine-dev/start-kiosk.sh << 'KIOSK_EOF'
 #!/bin/bash
 # Improved kiosk startup script with better error handling
 
@@ -800,14 +800,14 @@ while true; do
 done
 KIOSK_EOF
 
-chmod +x /home/$USER/.cocktail-machine/start-kiosk.sh
+chmod +x /home/$USER/.cocktail-machine-dev/start-kiosk.sh
 
 # Create auto-start script that runs after auto-login
 cat > /home/$USER/.bash_profile << 'PROFILE_EOF'
 # Auto-start kiosk when logging into tty1
 if [ "$(tty)" = "/dev/tty1" ] && [ -z "$DISPLAY" ]; then
     echo "Starting cocktail machine kiosk..."
-    /home/$USER/.cocktail-machine/start-kiosk.sh
+    /home/$USER/.cocktail-machine-dev/start-kiosk.sh
 fi
 PROFILE_EOF
 
@@ -904,7 +904,7 @@ echo "   • Dashboard files: $([ -f /opt/webroot/index.html ] && echo 'Present'
 echo "   • Webroot permissions: $(ls -ld /opt/webroot 2>/dev/null | awk '{print $1, $3, $4}' || echo 'Not accessible')"
 echo "   • Index.html size: $([ -f /opt/webroot/index.html ] && stat -c%s /opt/webroot/index.html || echo 'N/A') bytes"
 echo "   • Nginx config test: $(sudo nginx -t 2>&1 >/dev/null && echo 'Valid' || echo 'Invalid')"
-echo "   • Kiosk scripts: $([ -f /home/$USER/.cocktail-machine/kiosk-launcher.sh ] && echo 'Present' || echo 'Missing')"
+echo "   • Kiosk scripts: $([ -f /home/$USER/.cocktail-machine-dev/kiosk-launcher.sh ] && echo 'Present' || echo 'Missing')"
 
 # Try to fix common issues
 if ! pgrep nginx >/dev/null; then

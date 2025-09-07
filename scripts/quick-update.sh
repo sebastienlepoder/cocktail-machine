@@ -17,7 +17,7 @@ print_info() { echo -e "${YELLOW}ℹ${NC} $1"; }
 print_step() { echo -e "${BLUE}►${NC} $1"; }
 
 # Configuration
-DEPLOY_REPO=${DEPLOY_REPO:-"sebastienlepoder/cocktail-deploy"}
+DEPLOY_REPO=${DEPLOY_REPO:-"sebastienlepoder/cocktail-machine-prod"}
 BRANCH=${BRANCH:-"main"}
 SCRIPTS_DIR="/opt/scripts"
 

@@ -7,7 +7,7 @@ echo "=== Cocktail Machine Kiosk Startup Fix ==="
 
 # 1. Update nginx config with health endpoint
 echo "1. Fixing nginx configuration..."
-cd /home/pi/cocktail-machine/deployment
+cd /home/pi/cocktail-machine-dev/deployment
 
 # Backup current nginx config
 cp nginx/nginx.conf nginx/nginx.conf.backup
@@ -90,7 +90,7 @@ echo "3. Creating kiosk startup service..."
 sudo tee /etc/systemd/system/cocktail-kiosk-startup.service > /dev/null << 'EOF'
 [Unit]
 Description=Start Cocktail Machine Kiosk
-After=lightdm.service graphical.target cocktail-machine.service
+After=lightdm.service graphical.target cocktail-machine-dev.service
 Wants=lightdm.service
 
 [Service]
@@ -98,7 +98,7 @@ Type=oneshot
 RemainAfterExit=yes
 User=root
 ExecStartPre=/bin/sleep 15
-ExecStart=/bin/bash -c 'systemctl start lightdm; sleep 5; sudo -u pi DISPLAY=:0 /home/pi/.cocktail-machine/kiosk-launcher.sh &'
+ExecStart=/bin/bash -c 'systemctl start lightdm; sleep 5; sudo -u pi DISPLAY=:0 /home/pi/.cocktail-machine-dev/kiosk-launcher.sh &'
 
 [Install]
 WantedBy=graphical.target
@@ -119,7 +119,7 @@ if [ -z "$SSH_TTY" ] && [ -z "$DISPLAY" ] && [ "$TERM" = "linux" ]; then
         startx -- -nocursor &
         sleep 8
         export DISPLAY=:0
-        /home/pi/.cocktail-machine/kiosk-launcher.sh &
+        /home/pi/.cocktail-machine-dev/kiosk-launcher.sh &
     fi
 fi
 BASHRC

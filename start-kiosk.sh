@@ -10,7 +10,7 @@ sleep 5
 # Check if dashboard is running
 if ! curl -s http://localhost:3000 > /dev/null 2>&1; then
     echo "Dashboard not running. Starting Docker services..."
-    cd /home/pi/cocktail-machine/deployment
+    cd /home/pi/cocktail-machine-dev/deployment
     docker-compose up -d
     echo "Waiting for dashboard to start..."
     sleep 20

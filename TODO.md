@@ -8,16 +8,16 @@
 
 ### ✅ 1. Repo backup and deployment setup
 **Status:** ✅ COMPLETED  
-**Details:** Create the cocktail-deploy repository, set up GitHub secrets (DEPLOY_TOKEN), and test the automated deployment workflow
+**Details:** Create the cocktail-machine-prod repository, set up GitHub secrets (DEPLOY_TOKEN), and test the automated deployment workflow
 
 **Tasks:**
-- [x] Create `sebastienlepoder/cocktail-deploy` repository on GitHub
+- [x] Create `sebastienlepoder/cocktail-machine-prod` repository on GitHub
 - [x] Set up GitHub Personal Access Token
 - [x] Add `DEPLOY_TOKEN` secret to main repository
 - [x] Test GitHub Actions deployment workflow
 - [x] Verify deployment repository structure
 
-**✅ COMPLETED:** Deployment system is fully operational! GitHub Actions automatically builds and deploys to the cocktail-deploy repository. Version v2025.09.06-41ecda0 successfully deployed with all scripts and web files.
+**✅ COMPLETED:** Deployment system is fully operational! GitHub Actions automatically builds and deploys to the cocktail-machine-prod repository. Version v2025.09.06-41ecda0 successfully deployed with all scripts and web files.
 
 ---
 
@@ -207,7 +207,7 @@ Overall Progress:     ▓░░░░░░░░░ 20%
 
 **Immediate Priority:** Start with **Task #1 - Repo backup and deployment setup**
 
-1. Create the `cocktail-deploy` repository
+1. Create the `cocktail-machine-prod` repository
 2. Set up GitHub secrets and test deployment
 3. Then move to Node-RED flow deployment
 4. Begin Supabase integration

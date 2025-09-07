@@ -24,7 +24,7 @@ chromium-browser \
     --noerrdialogs \
     --disable-infobars \
     --disable-component-update \
-    "file://$HOME/.cocktail-machine/loading.html" &
+    "file://$HOME/.cocktail-machine-dev/loading.html" &
 
 LOADING_PID=$!
 log_msg "Loading screen PID: $LOADING_PID"

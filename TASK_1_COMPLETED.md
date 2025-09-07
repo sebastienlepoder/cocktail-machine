@@ -9,7 +9,7 @@
 ## 📋 What Was Accomplished
 
 ### ✅ **Repository Infrastructure**
-- **Created:** [`sebastienlepoder/cocktail-deploy`](https://github.com/sebastienlepoder/cocktail-deploy) - Public deployment repository
+- **Created:** [`sebastienlepoder/cocktail-machine-prod`](https://github.com/sebastienlepoder/cocktail-machine-prod) - Public deployment repository
 - **Purpose:** Distribution center for Raspberry Pi installations
 - **Structure:** 
   - `web/` - Built dashboard files and version tracking
@@ -26,7 +26,7 @@
   1. Builds web dashboard (Node.js/npm when available)
   2. Creates versioned deployment package
   3. Updates `versions.json` for Node-RED update system
-  4. Deploys to `cocktail-deploy` repository automatically
+  4. Deploys to `cocktail-machine-prod` repository automatically
 
 ### ✅ **Security Configuration**
 - **GitHub Token:** Personal Access Token configured as `DEPLOY_TOKEN` secret
@@ -50,7 +50,7 @@ graph LR
     A[Push to main] --> B[GitHub Actions]
     B --> C[Build Dashboard]
     C --> D[Create Package]
-    D --> E[Deploy to cocktail-deploy]
+    D --> E[Deploy to cocktail-machine-prod]
     E --> F[Pi Users Notified]
 ```
 
@@ -58,7 +58,7 @@ graph LR
 2. **GitHub Actions** automatically triggered
 3. **Builds** dashboard if Node.js project exists
 4. **Creates** deployment package with version info
-5. **Deploys** to `cocktail-deploy` repository
+5. **Deploys** to `cocktail-machine-prod` repository
 6. **Pi users** get notification via Node-RED update system
 
 ### **For Pi Users:**
@@ -75,7 +75,7 @@ graph LR
 
 ### **Successfully Deployed Version: `v2025.09.06-41ecda0`**
 
-**Deployment Repository:** https://github.com/sebastienlepoder/cocktail-deploy
+**Deployment Repository:** https://github.com/sebastienlepoder/cocktail-machine-prod
 
 **Contents Deployed:**
 - ✅ All development scripts from `deployment/` folder
@@ -162,13 +162,13 @@ The `setup-ultimate.sh` script now integrates with this deployment system:
 ### **Verification Commands:**
 ```bash
 # Check deployment worked
-curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/VERSION
+curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/VERSION
 
 # Check version metadata
-curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json
+curl -s https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/versions.json
 
 # Verify scripts are executable
-curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/start-services.sh
+curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/start-services.sh
 ```
 
 ---

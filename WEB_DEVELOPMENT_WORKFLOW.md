@@ -9,15 +9,15 @@ The cocktail machine uses a **4-repository deployment model** for web dashboard 
 | Repository | Type | Purpose | URL |
 |------------|------|---------|-----|
 | `cocktail-slider-display` | **Web Dev** | React dashboard development | https://github.com/sebastienlepoder/cocktail-slider-display |
-| `cocktail-machine` | **Main Dev** | Backend + deployment orchestration | https://github.com/sebastienlepoder/cocktail-machine |
-| `cocktail-deploy` | **Production** | Built releases for Pi users | https://github.com/sebastienlepoder/cocktail-deploy |
+| `cocktail-machine-dev` | **Main Dev** | Backend + deployment orchestration | https://github.com/sebastienlepoder/cocktail-machine-dev |
+| `cocktail-machine-prod` | **Production** | Built releases for Pi users | https://github.com/sebastienlepoder/cocktail-machine-prod |
 | `warp-cocktail-machine` | **Local Dev** | Your development environment | *This repo (synced via Warp)* |
 
 ## 🔄 Complete Deployment Flow
 
 ```
 🎨 Web Dashboard      🚀 Main Dev        🏭 Production       🤖 Pi Users
-(cocktail-slider-    (cocktail-         (cocktail-deploy)  (Raspberry Pi)
+(cocktail-slider-    (cocktail-         (cocktail-machine-prod)  (Raspberry Pi)
 display)             machine)           │                  │
 │                    │                  │                  │
 │-- Build & Pack --▶│                  │                  │
@@ -28,9 +28,9 @@ display)             machine)           │                  │
 ### Flow Explanation:
 
 1. **🎨 Web Development** - Develop React dashboard in `cocktail-slider-display`
-2. **📦 Build & Package** - GitHub Actions builds, packages, and deploys to `cocktail-machine` 
-3. **🔄 Integration** - Backend systems (Node-RED, MQTT) integrate in `cocktail-machine`
-4. **🚀 Production Deploy** - Manual deployment from `cocktail-machine` to `cocktail-deploy`
+2. **📦 Build & Package** - GitHub Actions builds, packages, and deploys to `cocktail-machine-dev` 
+3. **🔄 Integration** - Backend systems (Node-RED, MQTT) integrate in `cocktail-machine-dev`
+4. **🚀 Production Deploy** - Manual deployment from `cocktail-machine-dev` to `cocktail-machine-prod`
 5. **📱 User Updates** - Pi users get automatic notifications and one-click updates
 
 ## 🎨 Web Dashboard Development Process
@@ -92,14 +92,14 @@ When your web dashboard is ready to integrate with the backend:
 **What happens:**
 - ✅ Builds your React dashboard (`npm run build`)
 - ✅ Creates versioned package (e.g., `dashboard-v2025.01.06.minor-abc1234.tar.gz`)
-- ✅ Deploys package to `cocktail-machine` dev repository
+- ✅ Deploys package to `cocktail-machine-dev` dev repository
 - ✅ Creates deployment metadata for integration
 
 ### 5. Integration Testing
 
 After web deployment, test the integration:
 
-1. **Check the `cocktail-machine` repository** for your web package
+1. **Check the `cocktail-machine-dev` repository** for your web package
 2. **Test locally** if you have the backend running
 3. **Make adjustments** to backend integration if needed
 
@@ -107,7 +107,7 @@ After web deployment, test the integration:
 
 When both web dashboard and backend are ready for users:
 
-1. **Go to GitHub Actions** in your `cocktail-machine` repository
+1. **Go to GitHub Actions** in your `cocktail-machine-dev` repository
 2. **Select "🚀 Dev → Prod Deployment"** workflow
 3. **Click "Run workflow"**
 4. **Fill out the deployment form** with production release notes
@@ -116,7 +116,7 @@ When both web dashboard and backend are ready for users:
 **What happens:**
 - ✅ Extracts your pre-packaged web dashboard 
 - ✅ Combines with backend components (scripts, Node-RED, etc.)
-- ✅ Creates production release in `cocktail-deploy`
+- ✅ Creates production release in `cocktail-machine-prod`
 - ✅ Notifies Pi users for automatic updates
 
 ## 📋 Version Management
@@ -187,7 +187,7 @@ npm run build  # Test locally first
 ```bash
 # Check the web-to-dev.yml workflow logs
 # Verify DEPLOY_TOKEN permissions
-# Check if web/packages/ directory exists in cocktail-machine
+# Check if web/packages/ directory exists in cocktail-machine-dev
 ```
 
 ### Integration Issues
@@ -229,9 +229,9 @@ cocktail-slider-display/
 └── README.md
 ```
 
-### Dev Repository After Web Deployment (`cocktail-machine`)
+### Dev Repository After Web Deployment (`cocktail-machine-dev`)
 ```
-cocktail-machine/
+cocktail-machine-dev/
 ├── web/
 │   ├── packages/
 │   │   └── dashboard-v2025.01.06.minor-abc1234.tar.gz
@@ -243,9 +243,9 @@ cocktail-machine/
     └── dev-to-prod.yml         # Production deployment
 ```
 
-### Production Repository (`cocktail-deploy`)
+### Production Repository (`cocktail-machine-prod`)
 ```  
-cocktail-deploy/
+cocktail-machine-prod/
 ├── web/                        # Extracted dashboard files
 │   ├── index.html
 │   ├── static/
@@ -269,8 +269,8 @@ git add . && git commit -m "..." && git push  # Save changes
 
 ### Deploy to Production
 ```bash
-# After web dashboard is deployed to cocktail-machine
-# → Go to cocktail-machine GitHub Actions
+# After web dashboard is deployed to cocktail-machine-dev
+# → Go to cocktail-machine-dev GitHub Actions
 # → Run "Dev → Prod Deployment" 
 # → Pi users get automatic update notifications
 ```
@@ -278,10 +278,10 @@ git add . && git commit -m "..." && git push  # Save changes
 ### Check Deployment Status
 ```bash
 # Check web deployment
-curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/web/LATEST_DEPLOYMENT.json
+curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-dev/main/web/LATEST_DEPLOYMENT.json
 
 # Check production deployment  
-curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json
+curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/versions.json
 ```
 
 ---
@@ -291,9 +291,9 @@ curl https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web
 Your web development workflow is now:
 
 1. **🎨 Develop** React dashboard in `cocktail-slider-display`
-2. **📦 Build & Deploy** web dashboard to `cocktail-machine` via GitHub Actions
-3. **🔄 Integrate** with backend systems in `cocktail-machine`
-4. **🚀 Deploy** complete system to `cocktail-deploy` via GitHub Actions  
+2. **📦 Build & Deploy** web dashboard to `cocktail-machine-dev` via GitHub Actions
+3. **🔄 Integrate** with backend systems in `cocktail-machine-dev`
+4. **🚀 Deploy** complete system to `cocktail-machine-prod` via GitHub Actions  
 5. **📱 Users Update** via Node-RED dashboard or automatic notifications
 
 This gives you **controlled, versioned deployments** while maintaining **separation of concerns** between your web frontend and backend systems!

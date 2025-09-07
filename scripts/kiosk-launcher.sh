@@ -39,14 +39,14 @@ chromium-browser \
     --disable-renderer-backgrounding \
     --disable-field-trial-config \
     --disable-background-networking \
-    "file:///home/$USER/.cocktail-machine/loading.html" &
+    "file:///home/$USER/.cocktail-machine-dev/loading.html" &
 
 LOADING_PID=$!
 log "Loading screen started (PID: $LOADING_PID)"
 
 # Wait for service to be ready
 log "Checking if service is ready..."
-/home/$USER/.cocktail-machine/check-service.sh
+/home/$USER/.cocktail-machine-dev/check-service.sh
 SERVICE_STATUS=$?
 
 if [ $SERVICE_STATUS -eq 0 ]; then

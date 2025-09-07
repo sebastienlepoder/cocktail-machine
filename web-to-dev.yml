@@ -140,7 +140,7 @@ jobs:
     - name: 📥 Checkout dev repository
       uses: actions/checkout@v4
       with:
-        repository: sebastienlepoder/cocktail-machine
+        repository: sebastienlepoder/cocktail-machine-dev
         token: ${{ secrets.DEPLOY_TOKEN }}
         path: cocktail-machine-dev
         
@@ -224,13 +224,13 @@ jobs:
         echo "  Package: ${{ env.package_file }} (${{ env.package_size }})"
         echo "  Release Type: ${{ github.event.inputs.release_type }}"
         echo "  Source Commit: ${{ steps.commit_info.outputs.short_sha }}"
-        echo "  Deployed to: cocktail-machine (dev repository)"
+        echo "  Deployed to: cocktail-machine-dev (dev repository)"
         echo ""
         echo "📝 Release Notes:"
         echo "${{ github.event.inputs.release_notes }}"
         echo ""
         echo "🚀 Next Steps:"
-        echo "1. Review deployment in cocktail-machine repository"
+        echo "1. Review deployment in cocktail-machine-dev repository"
         echo "2. Test the updated dashboard"
         echo "3. When ready, use 'Dev → Prod Deployment' workflow"
         echo "4. Pi users will get automatic update notifications"

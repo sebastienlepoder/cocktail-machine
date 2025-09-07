@@ -20,9 +20,9 @@ print_info() { echo -e "${YELLOW}ℹ${NC} $1"; }
 print_step() { echo -e "${BLUE}►${NC} $1"; }
 
 # Configuration
-DEPLOY_REPO="sebastienlepoder/cocktail-deploy"
+DEPLOY_REPO="sebastienlepoder/cocktail-machine-prod"
 BRANCH="main"
-PROJECT_DIR="/home/$USER/cocktail-machine"
+PROJECT_DIR="/home/$USER/cocktail-machine-dev"
 SCRIPTS_DIR="/opt/scripts"
 WEBROOT_DIR="/opt/webroot"
 
@@ -308,20 +308,20 @@ print_status "Desktop environment installed"
 print_step "Step 8: Setting up kiosk system..."
 
 # Create kiosk directory
-mkdir -p /home/$USER/.cocktail-machine
+mkdir -p /home/$USER/.cocktail-machine-dev
 
 # Download production kiosk scripts
 print_info "Downloading production kiosk scripts..."
-curl -L -o /home/$USER/.cocktail-machine/kiosk-launcher.sh \
+curl -L -o /home/$USER/.cocktail-machine-dev/kiosk-launcher.sh \
     "https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/scripts/kiosk-launcher.sh"
-chmod +x /home/$USER/.cocktail-machine/kiosk-launcher.sh
+chmod +x /home/$USER/.cocktail-machine-dev/kiosk-launcher.sh
 
-curl -L -o /home/$USER/.cocktail-machine/check-service.sh \
+curl -L -o /home/$USER/.cocktail-machine-dev/check-service.sh \
     "https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/scripts/check-service.sh"
-chmod +x /home/$USER/.cocktail-machine/check-service.sh
+chmod +x /home/$USER/.cocktail-machine-dev/check-service.sh
 
 # Create beautiful loading screen
-cat > /home/$USER/.cocktail-machine/loading.html << 'EOF'
+cat > /home/$USER/.cocktail-machine-dev/loading.html << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -434,7 +434,7 @@ User=root
 Environment=DISPLAY=:0
 ExecStartPre=/bin/sleep 15
 ExecStartPre=/bin/bash -c 'while ! systemctl is-active lightdm >/dev/null 2>&1; do sleep 2; done'
-ExecStart=/bin/bash -c 'sudo -u $USER DISPLAY=:0 XAUTHORITY=/home/$USER/.Xauthority /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
+ExecStart=/bin/bash -c 'sudo -u $USER DISPLAY=:0 XAUTHORITY=/home/$USER/.Xauthority /home/$USER/.cocktail-machine-dev/kiosk-launcher.sh &'
 RemainAfterExit=yes
 Restart=on-failure
 RestartSec=10

@@ -4,7 +4,7 @@
 # Checks for Git updates and redeploys services automatically
 
 # Configuration
-GIT_REPO=${GIT_REPO:-"https://github.com/sebastienlepoder/cocktail-machine.git"}
+GIT_REPO=${GIT_REPO:-"https://github.com/sebastienlepoder/cocktail-machine-dev.git"}
 UPDATE_INTERVAL=${UPDATE_INTERVAL:-3600}  # Default: 1 hour
 APP_DIR="/app"
 DEPLOYMENT_DIR="/deployment"

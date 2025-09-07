@@ -4,7 +4,7 @@
 
 Go to https://github.com/new and create a new repository with these settings:
 
-- **Repository name**: `cocktail-machine`
+- **Repository name**: `cocktail-machine-dev`
 - **Description**: "Automated cocktail dispensing system with ESP32 modules and Raspberry Pi controller"
 - **Visibility**: Public (or Private if you prefer)
 - **DO NOT** initialize with README, .gitignore, or license (we already have these)
@@ -41,7 +41,7 @@ choco install gh
 gh auth login
 
 # Create the repository
-gh repo create cocktail-machine --public --source=. --remote=origin --push
+gh repo create cocktail-machine-dev --public --source=. --remote=origin --push
 ```
 
 ## Manual Push Commands
@@ -53,7 +53,7 @@ If the above doesn't work, try these commands:
 git remote remove origin
 
 # Add the remote again
-git remote add origin https://github.com/sebastienlepoder/cocktail-machine.git
+git remote add origin https://github.com/sebastienlepoder/cocktail-machine-dev.git
 
 # Push to main branch
 git push -u origin main
@@ -68,9 +68,9 @@ This means the repository doesn't exist on GitHub yet. You need to:
 ## After Successful Push
 
 Your repository will be available at:
-https://github.com/sebastienlepoder/cocktail-machine
+https://github.com/sebastienlepoder/cocktail-machine-dev
 
 The automated deployment script will work immediately:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/setup-ultimate.sh | bash
 ```

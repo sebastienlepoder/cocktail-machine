@@ -11,8 +11,8 @@ ssh pi@raspberrypi.local
 
 ### 2. Create the loading screen HTML
 ```bash
-mkdir -p ~/.cocktail-machine
-nano ~/.cocktail-machine/loading.html
+mkdir -p ~/.cocktail-machine-dev
+nano ~/.cocktail-machine-dev/loading.html
 ```
 
 Copy and paste this content:
@@ -98,14 +98,14 @@ Save and exit (Ctrl+X, Y, Enter).
 
 ### 3. Download and set up the kiosk script
 ```bash
-cd ~/cocktail-machine/deployment
-wget https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/start-kiosk.sh
+cd ~/cocktail-machine-dev/deployment
+wget https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/start-kiosk.sh
 chmod +x start-kiosk.sh
 ```
 
 Or create it manually:
 ```bash
-nano ~/cocktail-machine/deployment/start-kiosk.sh
+nano ~/cocktail-machine-dev/deployment/start-kiosk.sh
 ```
 
 ### 4. Set up auto-start using systemd (Recommended)
@@ -119,7 +119,7 @@ Add this content:
 ```ini
 [Unit]
 Description=Cocktail Machine Kiosk Display
-After=graphical.target cocktail-machine.service
+After=graphical.target cocktail-machine-dev.service
 Wants=graphical.target
 
 [Service]
@@ -128,7 +128,7 @@ User=pi
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY=/home/pi/.Xauthority"
 ExecStartPre=/bin/sleep 10
-ExecStart=/home/pi/cocktail-machine/deployment/start-kiosk.sh
+ExecStart=/home/pi/cocktail-machine-dev/deployment/start-kiosk.sh
 Restart=on-failure
 RestartSec=5
 
@@ -146,7 +146,7 @@ sudo systemctl enable cocktail-kiosk.service
 If systemd doesn't work, add to your .bashrc:
 ```bash
 echo 'if [ -z "$SSH_TTY" ] && [ "$TERM" = "linux" ]; then
-    startx /home/pi/cocktail-machine/deployment/start-kiosk.sh
+    startx /home/pi/cocktail-machine-dev/deployment/start-kiosk.sh
 fi' >> ~/.bashrc
 ```
 
@@ -191,8 +191,8 @@ sudo reboot
 
 ### If you see error 404:
 - The loading screen isn't being shown
-- Check if the loading.html file exists: `ls ~/.cocktail-machine/loading.html`
-- Try running the kiosk script manually: `DISPLAY=:0 ~/cocktail-machine/deployment/start-kiosk.sh`
+- Check if the loading.html file exists: `ls ~/.cocktail-machine-dev/loading.html`
+- Try running the kiosk script manually: `DISPLAY=:0 ~/cocktail-machine-dev/deployment/start-kiosk.sh`
 
 ### If nothing starts automatically:
 - Check if auto-login is configured: `systemctl status getty@tty1.service`
@@ -204,7 +204,7 @@ To test the kiosk mode manually:
 ```bash
 # From SSH session
 export DISPLAY=:0
-~/cocktail-machine/deployment/start-kiosk.sh
+~/cocktail-machine-dev/deployment/start-kiosk.sh
 ```
 
 ## Direct Browser Command

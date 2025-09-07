@@ -30,7 +30,7 @@ This project implements a complete cocktail dispensing system using ESP32 microc
 ## 🏗️ Architecture
 
 ```
-cocktail-machine/
+cocktail-machine-dev/
 ├── esp32/              # ESP32 firmware for bottle modules
 ├── node-red/           # Node-RED flows and automation
 ├── web/                # Web dashboard (React + Supabase)
@@ -116,13 +116,13 @@ The system automatically checks for updates every hour and applies them without 
 ### Manual Update
 
 ```bash
-/home/pi/cocktail-machine/update.sh
+/home/pi/cocktail-machine-dev/update.sh
 ```
 
 ### Backup
 
 ```bash
-/home/pi/cocktail-machine/backup.sh
+/home/pi/cocktail-machine-dev/backup.sh
 ```
 
 ## 📊 Services

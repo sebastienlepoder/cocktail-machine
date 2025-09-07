@@ -63,7 +63,7 @@ unclutter -idle 1 &
 sleep 3
 
 # Start the cocktail machine kiosk
-/home/pi/.cocktail-machine/simple-kiosk.sh &
+/home/pi/.cocktail-machine-dev/simple-kiosk.sh &
 EOF
 
 # Fix 7: Create a failsafe systemd service for the kiosk
@@ -82,7 +82,7 @@ Environment="DISPLAY=:0"
 Environment="HOME=/home/pi"
 Environment="XAUTHORITY=/home/pi/.Xauthority"
 ExecStartPre=/bin/bash -c 'while ! xset q &>/dev/null; do sleep 1; done'
-ExecStart=/home/pi/.cocktail-machine/simple-kiosk.sh
+ExecStart=/home/pi/.cocktail-machine-dev/simple-kiosk.sh
 Restart=on-failure
 RestartSec=5
 
@@ -92,9 +92,9 @@ EOF
 
 # Fix 8: Ensure the simple kiosk script exists
 echo "8. Ensuring kiosk script exists..."
-if [ ! -f /home/pi/.cocktail-machine/simple-kiosk.sh ]; then
-    mkdir -p /home/pi/.cocktail-machine
-    cat > /home/pi/.cocktail-machine/simple-kiosk.sh << 'KIOSK'
+if [ ! -f /home/pi/.cocktail-machine-dev/simple-kiosk.sh ]; then
+    mkdir -p /home/pi/.cocktail-machine-dev
+    cat > /home/pi/.cocktail-machine-dev/simple-kiosk.sh << 'KIOSK'
 #!/bin/bash
 # Simple kiosk script
 
@@ -108,10 +108,10 @@ pkill -f chromium 2>/dev/null
 sleep 2
 
 # Check if loading screen exists
-if [ -f /home/pi/.cocktail-machine/loading.html ]; then
+if [ -f /home/pi/.cocktail-machine-dev/loading.html ]; then
     echo "[$(date)] Starting with loading screen..." >> /tmp/kiosk.log
     chromium-browser --kiosk --noerrdialogs --disable-infobars \
-        "file:///home/pi/.cocktail-machine/loading.html" &
+        "file:///home/pi/.cocktail-machine-dev/loading.html" &
     BROWSER_PID=$!
     
     # Wait for service
@@ -138,7 +138,7 @@ else
         "http://localhost:3000" &
 fi
 KIOSK
-    chmod +x /home/pi/.cocktail-machine/simple-kiosk.sh
+    chmod +x /home/pi/.cocktail-machine-dev/simple-kiosk.sh
 fi
 
 # Fix 9: Enable services

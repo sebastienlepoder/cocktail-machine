@@ -12,12 +12,12 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration - can be overridden by environment variables
-DEPLOY_REPO=${DEPLOY_REPO:-"sebastienlepoder/cocktail-deploy"}
+DEPLOY_REPO=${DEPLOY_REPO:-"sebastienlepoder/cocktail-machine-prod"}
 BRANCH=${BRANCH:-"main"}
 WEBROOT=${WEBROOT:-"/opt/webroot"}
 BACKUP_DIR=${BACKUP_DIR:-"/opt/backup"}
 SCRIPTS_DIR=${SCRIPTS_DIR:-"/opt/scripts"}
-SERVICE_NAME=${SERVICE_NAME:-"cocktail-machine"}
+SERVICE_NAME=${SERVICE_NAME:-"cocktail-machine-dev"}
 
 # Create directories if they don't exist
 mkdir -p "$WEBROOT" "$BACKUP_DIR" "$SCRIPTS_DIR"
@@ -120,7 +120,7 @@ download_and_extract() {
     cp -r web/* "$WEBROOT/"
     
     # Also copy to Docker web directory if it exists
-    DOCKER_WEB_DIR="/home/pi/cocktail-machine/web"
+    DOCKER_WEB_DIR="/home/pi/cocktail-machine-dev/web"
     if [ -d "$DOCKER_WEB_DIR" ]; then
         print_info "Updating Docker web directory"
         rm -rf "$DOCKER_WEB_DIR"/*
@@ -129,9 +129,9 @@ download_and_extract() {
         chmod -R 755 "$DOCKER_WEB_DIR"
         
         # Restart Docker web container if docker-compose is available
-        if [ -f "/home/pi/cocktail-machine/deployment/docker-compose.yml" ]; then
+        if [ -f "/home/pi/cocktail-machine-dev/deployment/docker-compose.yml" ]; then
             print_info "Restarting Docker web container"
-            cd /home/pi/cocktail-machine/deployment
+            cd /home/pi/cocktail-machine-dev/deployment
             docker-compose restart web-dashboard 2>/dev/null || true
         fi
     fi
@@ -163,8 +163,8 @@ restart_services() {
         fi
         
         # Restart Docker services if they exist
-        if [ -f ~/cocktail-machine/deployment/docker-compose.yml ]; then
-            cd ~/cocktail-machine/deployment
+        if [ -f ~/cocktail-machine-dev/deployment/docker-compose.yml ]; then
+            cd ~/cocktail-machine-dev/deployment
             docker-compose restart web-dashboard 2>/dev/null || true
             print_info "Docker services restarted"
         fi
@@ -286,7 +286,7 @@ Arguments:
                       If not specified, installs latest version
 
 Environment Variables:
-    DEPLOY_REPO        GitHub repository (default: sebastienlepoder/cocktail-deploy)
+    DEPLOY_REPO        GitHub repository (default: sebastienlepoder/cocktail-machine-prod)
     BRANCH             Branch to use (default: main)
     WEBROOT            Web root directory (default: /opt/webroot)
     BACKUP_DIR         Backup directory (default: /opt/backup)

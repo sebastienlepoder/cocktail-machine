@@ -11,14 +11,14 @@ The cocktail machine uses a **dev → production deployment model** with separat
 | Repository | Type | Purpose | URL |
 |------------|------|---------|-----|
 | `warp-cocktail-machine` | **Local Dev** | Your development environment | *This repo* |
-| `cocktail-machine` | **GitHub Dev** | Development repo (synced via Warp) | https://github.com/sebastienlepoder/cocktail-machine |
-| `cocktail-deploy` | **Production** | Built releases for Pi users | https://github.com/sebastienlepoder/cocktail-deploy |
+| `cocktail-machine-dev` | **GitHub Dev** | Development repo (synced via Warp) | https://github.com/sebastienlepoder/cocktail-machine-dev |
+| `cocktail-machine-prod` | **Production** | Built releases for Pi users | https://github.com/sebastienlepoder/cocktail-machine-prod |
 
 ### 🔄 Deployment Flow
 
 ```
 💻 Local Development    🚀 GitHub Dev         🏭 Production          🤖 Pi Users
-(warp-cocktail-     (cocktail-machine)   (cocktail-deploy)    (Raspberry Pi)
+(warp-cocktail-     (cocktail-machine-dev)   (cocktail-machine-prod)    (Raspberry Pi)
 machine)            │                    │                   │
 │                   │                    │                   │
 │-- Warp sync ---▶│                    │                   │
@@ -37,15 +37,15 @@ machine)            │                    │                   │
 
 ### 1. Create Deployment Repository
 
-First, create the `cocktail-deploy` repository on GitHub:
+First, create the `cocktail-machine-prod` repository on GitHub:
 
 ```bash
 # Create new repository
-gh repo create sebastienlepoder/cocktail-deploy --public --description "Cocktail Machine Pi Deployment Releases"
+gh repo create sebastienlepoder/cocktail-machine-prod --public --description "Cocktail Machine Pi Deployment Releases"
 
 # Clone and set up basic structure
-git clone https://github.com/sebastienlepoder/cocktail-deploy.git
-cd cocktail-deploy
+git clone https://github.com/sebastienlepoder/cocktail-machine-prod.git
+cd cocktail-machine-prod
 
 # Create initial structure
 mkdir -p web scripts kiosk
@@ -60,9 +60,9 @@ git push origin main
 
 ### 2. Configure GitHub Secrets
 
-In your **development repository** (`cocktail-machine` on GitHub), add these secrets:
+In your **development repository** (`cocktail-machine-dev` on GitHub), add these secrets:
 
-1. Go to https://github.com/sebastienlepoder/cocktail-machine/settings/secrets/actions
+1. Go to https://github.com/sebastienlepoder/cocktail-machine-dev/settings/secrets/actions
 2. Click **"New repository secret"**
 3. Add this secret:
 
@@ -89,11 +89,11 @@ Your Node-RED flow already has the update system! It includes:
 ### Development to Production Workflow
 
 **Your repositories:**
-- **Development:** `warp-cocktail-machine` (local) ↔ `cocktail-machine` (GitHub)
-- **Production:** `cocktail-deploy` (GitHub)
+- **Development:** `warp-cocktail-machine` (local) ↔ `cocktail-machine-dev` (GitHub)
+- **Production:** `cocktail-machine-prod` (GitHub)
 
 **Deployment process:**
-1. **Develop locally** in `warp-cocktail-machine` (synced to `cocktail-machine` via Warp)
+1. **Develop locally** in `warp-cocktail-machine` (synced to `cocktail-machine-dev` via Warp)
 2. **When ready for production:** Manually deploy from dev to prod
 3. **Pi users:** Get automatic update notifications
 
@@ -101,7 +101,7 @@ Your Node-RED flow already has the update system! It includes:
 
 **When your dev repo is ready for Pi users:**
 
-1. Go to **Actions** tab in [`cocktail-machine`](https://github.com/sebastienlepoder/cocktail-machine) repository
+1. Go to **Actions** tab in [`cocktail-machine-dev`](https://github.com/sebastienlepoder/cocktail-machine-dev) repository
 2. Select **"🚀 Dev → Prod Deployment"** workflow
 3. Click **"Run workflow"**
 4. Fill out the deployment form:
@@ -116,7 +116,7 @@ Your Node-RED flow already has the update system! It includes:
 1. **Builds** the dashboard from your dev repo (`npm run build`)
 2. **Creates** production package with version number
 3. **Generates** `versions.json` for the update system
-4. **Deploys** to the `cocktail-deploy` production repository
+4. **Deploys** to the `cocktail-machine-prod` production repository
 5. **Updates** Pi user notification system
 
 ### Legacy Auto-Deployment
@@ -154,17 +154,17 @@ sudo /opt/scripts/update_dashboard.sh v2.1.0
 ### Method 4: Quick Update (One-liner)
 ```bash
 # Download latest update script and run
-sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/quick-update.sh)"
+sudo bash -c "$(curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/quick-update.sh)"
 ```
 
 ### Method 5: Manual Service Start
 If you need to manually start/restart the Docker services:
 ```bash
 # Using the convenient start script
-cd ~/cocktail-machine/deployment && ./start-services.sh
+cd ~/cocktail-machine-dev/deployment && ./start-services.sh
 
 # Or using docker-compose directly
-cd ~/cocktail-machine/deployment && docker-compose up -d
+cd ~/cocktail-machine-dev/deployment && docker-compose up -d
 ```
 
 ## 📝 Version Management
@@ -211,7 +211,7 @@ Users can customize update behavior with environment variables:
 
 ```bash
 # Custom deployment repository
-export DEPLOY_REPO="myusername/my-cocktail-deploy"
+export DEPLOY_REPO="myusername/my-cocktail-machine-prod"
 
 # Custom branch
 export BRANCH="production"
@@ -231,7 +231,7 @@ sudo -E /opt/scripts/update_dashboard.sh
 
 Update scripts are downloaded from:
 ```
-https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/update_dashboard.sh
+https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/update_dashboard.sh
 ```
 
 You can host your own version by changing the `DEPLOY_REPO` environment variable.
@@ -253,7 +253,7 @@ sudo chmod -R 755 /opt/webroot
 ping github.com
 
 # Check if URLs are accessible
-curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/web/versions.json
+curl -I https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/web/versions.json
 ```
 
 **3. Node-RED API Not Working**
@@ -298,9 +298,9 @@ tail -f /var/log/apache2/error.log
 
 1. **Develop locally** in `warp-cocktail-machine` (this repo)
 2. **Test changes** in your local environment
-3. **Warp automatically syncs** your changes to `cocktail-machine` GitHub repo
+3. **Warp automatically syncs** your changes to `cocktail-machine-dev` GitHub repo
 4. **When ready for production:** Go to GitHub Actions and run **"Dev → Prod Deployment"**
-5. **GitHub Actions** builds and deploys to `cocktail-deploy` production repo
+5. **GitHub Actions** builds and deploys to `cocktail-machine-prod` production repo
 6. **Pi users** get notified and can update via Node-RED UI
 
 📋 **For detailed deployment workflow, see:** [HOW_TO_DEPLOY.md](HOW_TO_DEPLOY.md) ← **Simple 3-step guide**  
@@ -368,11 +368,11 @@ You can maintain separate deployment environments:
 
 ```bash
 # Production updates (default)
-export DEPLOY_REPO="sebastienlepoder/cocktail-deploy"
+export DEPLOY_REPO="sebastienlepoder/cocktail-machine-prod"
 export BRANCH="main"
 
 # Development updates
-export DEPLOY_REPO="sebastienlepoder/cocktail-deploy-dev"  
+export DEPLOY_REPO="sebastienlepoder/cocktail-machine-prod-dev"  
 export BRANCH="development"
 
 # Run update with custom environment
@@ -397,7 +397,7 @@ sudo -E /opt/scripts/update_dashboard.sh
 ## 🎉 Quick Start Summary
 
 **For You (Developer):**
-1. ✅ `cocktail-deploy` repository already set up
+1. ✅ `cocktail-machine-prod` repository already set up
 2. ✅ `DEPLOY_TOKEN` secret already configured  
 3. **Develop locally** in `warp-cocktail-machine` (syncs to GitHub automatically)
 4. **When ready for production:** Go to GitHub Actions → **"🚀 Dev → Prod Deployment"** → Run workflow
@@ -457,7 +457,7 @@ Connect to your Raspberry Pi via SSH or directly, then run the **Production Setu
 
 ```bash
 # Download and run the production setup script (one-line install)
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/setup-ultimate.sh | bash
 ```
 
 **This setup script provides:**
@@ -484,7 +484,7 @@ This script will:
 Edit the environment file with your Supabase credentials:
 
 ```bash
-nano /home/pi/cocktail-machine/deployment/.env
+nano /home/pi/cocktail-machine-dev/deployment/.env
 ```
 
 Update these values:
@@ -535,8 +535,8 @@ sudo apt-get install -y docker-compose
 ### Step 2: Clone Repository
 
 ```bash
-git clone https://github.com/sebastienlepoder/cocktail-machine.git
-cd cocktail-machine
+git clone https://github.com/sebastienlepoder/cocktail-machine-dev.git
+cd cocktail-machine-dev
 ```
 
 ### Step 3: Create Environment File
@@ -603,7 +603,7 @@ Using Arduino IDE:
 ### Viewing Logs
 
 ```bash
-cd /home/pi/cocktail-machine/deployment
+cd /home/pi/cocktail-machine-dev/deployment
 docker-compose logs -f  # All services
 docker-compose logs -f mosquitto  # Specific service
 ```
@@ -611,7 +611,7 @@ docker-compose logs -f mosquitto  # Specific service
 ### Manual Update
 
 ```bash
-/home/pi/cocktail-machine/update.sh
+/home/pi/cocktail-machine-dev/update.sh
 ```
 
 ### Backup
@@ -619,13 +619,13 @@ docker-compose logs -f mosquitto  # Specific service
 Automatic backups run daily at 2 AM. Manual backup:
 
 ```bash
-/home/pi/cocktail-machine/backup.sh
+/home/pi/cocktail-machine-dev/backup.sh
 ```
 
 ### Restore from Backup
 
 ```bash
-cd /home/pi/cocktail-machine
+cd /home/pi/cocktail-machine-dev
 tar -xzf /home/pi/cocktail-backups/cocktail_backup_TIMESTAMP.tar.gz
 cd deployment
 docker-compose down
@@ -647,7 +647,7 @@ cat /tmp/kiosk-launcher.log
 cat /tmp/kiosk-service-check.log
 
 # Check if services are running
-cd /home/pi/cocktail-machine/deployment
+cd /home/pi/cocktail-machine-dev/deployment
 docker-compose ps
 
 # Manually test service health
@@ -659,7 +659,7 @@ curl http://localhost/health
 ```bash
 # Kill browser and restart kiosk
 pkill -f chromium
-DISPLAY=:0 /home/pi/.cocktail-machine/kiosk-launcher.sh
+DISPLAY=:0 /home/pi/.cocktail-machine-dev/kiosk-launcher.sh
 ```
 
 ### Boot Messages Still Showing
@@ -702,7 +702,7 @@ docker ps -a
 
 Restart services:
 ```bash
-cd /home/pi/cocktail-machine/deployment
+cd /home/pi/cocktail-machine-dev/deployment
 docker-compose down
 docker-compose up -d
 ```
