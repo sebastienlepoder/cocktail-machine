@@ -548,7 +548,6 @@ sudo apt-get install -y \
     openbox \
     x11-xserver-utils \
     x11-utils \
-    xset \
     unclutter
 
 print_info "Installing display manager and browser..."
