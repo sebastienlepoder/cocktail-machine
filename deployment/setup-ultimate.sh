@@ -546,6 +546,8 @@ sudo apt-get install -y \
     xorg \
     openbox \
     x11-xserver-utils \
+    x11-utils \
+    xset \
     unclutter
 
 print_info "Installing display manager and browser..."
@@ -573,10 +575,10 @@ mkdir -p /home/$USER/.cocktail-machine
 # Download production kiosk scripts (but modify them for direct nginx)
 print_info "Downloading and configuring kiosk scripts..."
 
-# Create custom kiosk launcher for direct nginx access
+# Create custom kiosk launcher with proper X11 authorization
 cat > /home/$USER/.cocktail-machine/kiosk-launcher.sh << 'EOF'
 #!/bin/bash
-# Kiosk Launcher for nginx-served React dashboard
+# Kiosk Launcher for nginx-served React dashboard with X11 support
 
 LOG_FILE="/tmp/kiosk-launcher.log"
 
@@ -586,10 +588,65 @@ log() {
 
 log "=== Kiosk Launcher Started ==="
 
-# Ensure DISPLAY is set
+# Setup X11 environment
 export DISPLAY=:0
+export HOME=/home/$USER
+
+# Find and set XAUTHORITY
+log "Setting up X11 authorization..."
+if [ -f "/var/run/lightdm/root/:0" ]; then
+    export XAUTHORITY="/var/run/lightdm/root/:0"
+    log "Using lightdm XAUTHORITY: $XAUTHORITY"
+elif [ -f "/home/$USER/.Xauthority" ]; then
+    export XAUTHORITY="/home/$USER/.Xauthority"
+    log "Using user XAUTHORITY: $XAUTHORITY"
+else
+    log "Warning: No XAUTHORITY file found, trying without..."
+fi
+
+# Wait for X11 server to be ready
+log "Waiting for X11 server..."
+for i in {1..30}; do
+    if xset q >/dev/null 2>&1; then
+        log "X11 server is ready"
+        break
+    elif [ $i -eq 30 ]; then
+        log "X11 server not responding, continuing anyway..."
+    else
+        sleep 1
+    fi
+done
+
+# Test X11 connection
+if ! xset q >/dev/null 2>&1; then
+    log "Warning: Cannot connect to X11 display, trying alternative methods..."
+    
+    # Try different XAUTHORITY locations
+    for auth_file in "/var/run/lightdm/root/:0" "/run/lightdm/root/:0" "/home/$USER/.Xauthority"; do
+        if [ -f "$auth_file" ]; then
+            export XAUTHORITY="$auth_file"
+            log "Trying XAUTHORITY: $auth_file"
+            if xset q >/dev/null 2>&1; then
+                log "X11 connection successful with $auth_file"
+                break
+            fi
+        fi
+    done
+fi
+
+# Final X11 test
+if xset q >/dev/null 2>&1; then
+    log "X11 connection confirmed - proceeding with browser launch"
+else
+    log "ERROR: Cannot establish X11 connection. Display: $DISPLAY, Auth: $XAUTHORITY"
+    log "Available auth files:"
+    find /var/run/lightdm /run/lightdm /home/$USER -name "*:0" -o -name ".Xauthority" 2>/dev/null | while read f; do
+        log "  Found: $f ($(ls -la "$f" 2>/dev/null || echo 'not readable'))"
+    done
+fi
 
 # Kill any existing browser processes
+log "Cleaning up existing browser processes..."
 pkill -f chromium-browser 2>/dev/null || true
 sleep 2
 
@@ -608,7 +665,11 @@ chromium-browser \
     --fast \
     --fast-start \
     --disable-component-update \
-    "file:///home/$USER/.cocktail-machine/loading.html" &
+    --disable-dev-shm-usage \
+    --disable-software-rasterizer \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    "file:///home/$USER/.cocktail-machine/loading.html" >/dev/null 2>&1 &
 
 LOADING_PID=$!
 log "Loading screen started (PID: $LOADING_PID)"
@@ -630,7 +691,12 @@ done
 if [ $WAITED -ge $MAX_WAIT ]; then
     log "Nginx failed to start, showing error page..."
     kill $LOADING_PID 2>/dev/null || true
-    chromium-browser --kiosk "data:text/html,<html><body style='background:#e74c3c;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial'><div style='text-align:center'><h1>Service Error</h1><p>Cocktail machine service failed to start</p></div></body></html>" &
+    sleep 1
+    chromium-browser \
+        --kiosk \
+        --disable-dev-shm-usage \
+        --disable-software-rasterizer \
+        "data:text/html,<html><body style='background:#e74c3c;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial'><div style='text-align:center'><h1>Service Error</h1><p>Cocktail machine service failed to start</p></div></body></html>" >/dev/null 2>&1 &
     exit 1
 fi
 
@@ -654,9 +720,25 @@ chromium-browser \
     --fast \
     --fast-start \
     --disable-component-update \
-    "http://localhost" &
+    --disable-dev-shm-usage \
+    --disable-software-rasterizer \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    "http://localhost" >/dev/null 2>&1 &
 
-log "Dashboard started successfully!"
+CHROMIUM_PID=$!
+log "Dashboard started successfully (PID: $CHROMIUM_PID)!"
+
+# Monitor the browser process
+sleep 5
+if ps -p $CHROMIUM_PID > /dev/null; then
+    log "Browser process is running correctly"
+else
+    log "ERROR: Browser process exited unexpectedly"
+    log "Attempting restart in 10 seconds..."
+    sleep 10
+    exec "$0"  # Restart this script
+fi
 EOF
 
 chmod +x /home/$USER/.cocktail-machine/kiosk-launcher.sh
@@ -756,24 +838,28 @@ else
     print_info "Display manager may need manual configuration after reboot"
 fi
 
-# Create systemd service for kiosk
+# Create systemd service for kiosk with improved X11 support
 sudo tee /etc/systemd/system/cocktail-kiosk-startup.service > /dev/null << EOF
 [Unit]
 Description=Start Cocktail Machine Kiosk
-After=lightdm.service graphical.target multi-user.target
-Wants=lightdm.service
+After=lightdm.service graphical.target multi-user.target display-manager.service
+Wants=lightdm.service display-manager.service
 Requires=graphical.target
 
 [Service]
 Type=forking
 User=root
 Environment=DISPLAY=:0
-ExecStartPre=/bin/sleep 15
+Environment=HOME=/root
+ExecStartPre=/bin/sleep 20
 ExecStartPre=/bin/bash -c 'while ! systemctl is-active lightdm >/dev/null 2>&1; do sleep 2; done'
-ExecStart=/bin/bash -c 'sudo -u $USER DISPLAY=:0 XAUTHORITY=/home/$USER/.Xauthority /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
+ExecStartPre=/bin/bash -c 'while ! pgrep Xorg >/dev/null 2>&1; do sleep 2; done'
+ExecStartPre=/bin/bash -c 'for i in {1..30}; do if [ -f "/var/run/lightdm/root/:0" ] || [ -f "/home/$USER/.Xauthority" ]; then break; fi; sleep 1; done'
+ExecStart=/bin/bash -c 'sudo -u $USER DISPLAY=:0 /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
 RemainAfterExit=yes
 Restart=on-failure
-RestartSec=10
+RestartSec=15
+TimeoutStartSec=120
 
 [Install]
 WantedBy=graphical.target
