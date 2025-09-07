@@ -1,17 +1,17 @@
 name: Deploy Dashboard to Pi Release Repo
 
 on:
-  # Trigger on pushes to main that affect web dashboard files
-  push:
-    branches: [ main ]
-    paths:
-      - 'web/**'
-      - 'scripts/**'
-      - 'kiosk/**'
-      - 'deployment/**'
-      - 'package*.json'
+  # DISABLED: Automatic deployment to prevent conflicts with dev-to-prod workflow
+  # push:
+  #   branches: [ main ]
+  #   paths:
+  #     - 'web/**'
+  #     - 'scripts/**'
+  #     - 'kiosk/**'
+  #     - 'deployment/**'
+  #     - 'package*.json'
   
-  # Allow manual workflow dispatch
+  # Allow manual workflow dispatch only
   workflow_dispatch:
     inputs:
       force_deploy:
