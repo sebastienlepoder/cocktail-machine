@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.0"
-SCRIPT_BUILD="Build-001"
+SCRIPT_VERSION="2025.09.07-v1.0.1"
+SCRIPT_BUILD="Build-002"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -540,436 +540,101 @@ fi
 
 print_status "Backend services startup attempted"
 
-# Step 8: Install X11 and Desktop Environment for kiosk
-print_step "Step 8: Installing X11 and minimal desktop..."
+# Step 8: Web-Only Setup (Skip Desktop Environment)
+print_step "Step 8: Setting up web-only mode..."
 
-print_info "Installing X11 and window manager..."
-sudo apt-get install -y \
-    --no-install-recommends \
-    xserver-xorg \
-    xserver-xorg-video-fbdev \
-    xserver-xorg-legacy \
-    xorg \
-    openbox \
-    x11-xserver-utils \
-    x11-utils \
-    unclutter
+print_info "Skipping desktop environment - using web dashboard only"
+print_info "React dashboard will be accessible via web browser at http://pi-ip"
 
-print_info "Installing display manager and browser..."
-sudo apt-get install -y \
-    lightdm \
-    lightdm-gtk-greeter
-    
-# Try to install chromium (different package names on different systems)
-if sudo apt-get install -y chromium-browser; then
-    print_status "Chromium browser installed"
-elif sudo apt-get install -y chromium; then
-    print_status "Chromium installed"
-else
-    print_error "Failed to install chromium browser"
-fi
-
-# Configure X11 for Raspberry Pi graphics
-print_info "Configuring X11 for Raspberry Pi..."
-sudo mkdir -p /etc/X11/xorg.conf.d
-
-# Create X11 configuration for Raspberry Pi
-sudo tee /etc/X11/xorg.conf.d/99-fbdev.conf > /dev/null << 'X11_CONF_EOF'
-Section "Device"
-    Identifier "Raspberry Pi Framebuffer"
-    Driver "fbdev"
-    Option "fbdev" "/dev/fb0"
-EndSection
-
-Section "Screen"
-    Identifier "Default Screen"
-    Device "Raspberry Pi Framebuffer"
-EndSection
-X11_CONF_EOF
-
-# Alternative configuration using modesetting driver
-sudo tee /etc/X11/xorg.conf.d/98-pitft.conf > /dev/null << 'X11_ALT_CONF_EOF'
-Section "Device"
-    Identifier "Card0"
-    Driver "modesetting"
-    Option "kmsdev" "/dev/dri/card1"
-EndSection
-X11_ALT_CONF_EOF
-
-# Allow X11 to be started by any user (needed for lightdm)
-sudo dpkg-reconfigure -f noninteractive xserver-xorg-legacy
-echo 'allowed_users=anybody' | sudo tee /etc/X11/Xwrapper.config > /dev/null
-echo 'needs_root_rights=yes' | sudo tee -a /etc/X11/Xwrapper.config > /dev/null
-
-print_status "Desktop environment installed and configured"
-
-# Step 9: Create kiosk system
-print_step "Step 9: Setting up kiosk system..."
-
-# Create kiosk directory
-mkdir -p /home/$USER/.cocktail-machine
-
-# Download production kiosk scripts (but modify them for direct nginx)
-print_info "Downloading and configuring kiosk scripts..."
-
-# Create custom kiosk launcher with proper X11 authorization
-cat > /home/$USER/.cocktail-machine/kiosk-launcher.sh << 'EOF'
-#!/bin/bash
-# Kiosk Launcher for nginx-served React dashboard with X11 support
-
-LOG_FILE="/tmp/kiosk-launcher.log"
-
-log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
-}
-
-log "=== Kiosk Launcher Started ==="
-
-# Setup X11 environment
-export DISPLAY=:0
-export HOME=/home/$USER
-
-# Find and set XAUTHORITY
-log "Setting up X11 authorization..."
-if [ -f "/var/run/lightdm/root/:0" ]; then
-    export XAUTHORITY="/var/run/lightdm/root/:0"
-    log "Using lightdm XAUTHORITY: $XAUTHORITY"
-elif [ -f "/home/$USER/.Xauthority" ]; then
-    export XAUTHORITY="/home/$USER/.Xauthority"
-    log "Using user XAUTHORITY: $XAUTHORITY"
-else
-    log "Warning: No XAUTHORITY file found, trying without..."
-fi
-
-# Wait for X11 server to be ready
-log "Waiting for X11 server..."
-for i in {1..30}; do
-    if xset q >/dev/null 2>&1; then
-        log "X11 server is ready"
-        break
-    elif [ $i -eq 30 ]; then
-        log "X11 server not responding, continuing anyway..."
-    else
-        sleep 1
-    fi
-done
-
-# Test X11 connection
-if ! xset q >/dev/null 2>&1; then
-    log "Warning: Cannot connect to X11 display, trying alternative methods..."
-    
-    # Try different XAUTHORITY locations
-    for auth_file in "/var/run/lightdm/root/:0" "/run/lightdm/root/:0" "/home/$USER/.Xauthority"; do
-        if [ -f "$auth_file" ]; then
-            export XAUTHORITY="$auth_file"
-            log "Trying XAUTHORITY: $auth_file"
-            if xset q >/dev/null 2>&1; then
-                log "X11 connection successful with $auth_file"
-                break
-            fi
-        fi
-    done
-fi
-
-# Final X11 test
-if xset q >/dev/null 2>&1; then
-    log "X11 connection confirmed - proceeding with browser launch"
-else
-    log "ERROR: Cannot establish X11 connection. Display: $DISPLAY, Auth: $XAUTHORITY"
-    log "Available auth files:"
-    find /var/run/lightdm /run/lightdm /home/$USER -name "*:0" -o -name ".Xauthority" 2>/dev/null | while read f; do
-        log "  Found: $f ($(ls -la "$f" 2>/dev/null || echo 'not readable'))"
-    done
-fi
-
-# Kill any existing browser processes
-log "Cleaning up existing browser processes..."
-pkill -f chromium-browser 2>/dev/null || true
-sleep 2
-
-# Start loading screen
-log "Starting loading screen..."
-chromium-browser \
-    --kiosk \
-    --noerrdialogs \
-    --disable-infobars \
-    --disable-extensions \
-    --disable-plugins \
-    --disable-translate \
-    --disable-features=TranslateUI \
-    --autoplay-policy=no-user-gesture-required \
-    --no-first-run \
-    --fast \
-    --fast-start \
-    --disable-component-update \
-    --disable-dev-shm-usage \
-    --disable-software-rasterizer \
-    --disable-background-timer-throttling \
-    --disable-renderer-backgrounding \
-    "file:///home/$USER/.cocktail-machine/loading.html" >/dev/null 2>&1 &
-
-LOADING_PID=$!
-log "Loading screen started (PID: $LOADING_PID)"
-
-# Wait for nginx to be ready
-log "Checking if nginx is ready..."
-MAX_WAIT=60
-WAITED=0
-
-while [ $WAITED -lt $MAX_WAIT ]; do
-    if curl -s http://localhost/health | grep -q "healthy"; then
-        log "Nginx is ready!"
-        break
-    fi
-    sleep 2
-    WAITED=$((WAITED + 2))
-done
-
-if [ $WAITED -ge $MAX_WAIT ]; then
-    log "Nginx failed to start, showing error page..."
-    kill $LOADING_PID 2>/dev/null || true
-    sleep 1
-    chromium-browser \
-        --kiosk \
-        --disable-dev-shm-usage \
-        --disable-software-rasterizer \
-        "data:text/html,<html><body style='background:#e74c3c;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:Arial'><div style='text-align:center'><h1>Service Error</h1><p>Cocktail machine service failed to start</p></div></body></html>" >/dev/null 2>&1 &
-    exit 1
-fi
-
-# Kill loading screen and start dashboard
-log "Service is ready! Switching to dashboard..."
-kill $LOADING_PID 2>/dev/null || true
-sleep 2
-
-# Start dashboard
-log "Starting dashboard..."
-chromium-browser \
-    --kiosk \
-    --noerrdialogs \
-    --disable-infobars \
-    --disable-extensions \
-    --disable-plugins \
-    --disable-translate \
-    --disable-features=TranslateUI \
-    --autoplay-policy=no-user-gesture-required \
-    --no-first-run \
-    --fast \
-    --fast-start \
-    --disable-component-update \
-    --disable-dev-shm-usage \
-    --disable-software-rasterizer \
-    --disable-background-timer-throttling \
-    --disable-renderer-backgrounding \
-    "http://localhost" >/dev/null 2>&1 &
-
-CHROMIUM_PID=$!
-log "Dashboard started successfully (PID: $CHROMIUM_PID)!"
-
-# Monitor the browser process
-sleep 5
-if ps -p $CHROMIUM_PID > /dev/null; then
-    log "Browser process is running correctly"
-else
-    log "ERROR: Browser process exited unexpectedly"
-    log "Attempting restart in 10 seconds..."
-    sleep 10
-    exec "$0"  # Restart this script
-fi
-EOF
-
-chmod +x /home/$USER/.cocktail-machine/kiosk-launcher.sh
-
-# Create loading screen
-cat > /home/$USER/.cocktail-machine/loading.html << 'EOF'
+# Create a simple system info page instead of kiosk
+sudo tee /opt/webroot/system-info.html > /dev/null << 'SYSTEM_INFO_EOF'
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cocktail Machine Loading</title>
+    <title>🍹 Cocktail Machine - System Information</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 20px; 
+            margin: 0;
         }
-        .container {
-            text-align: center;
-            animation: fadeIn 1s ease-in;
+        .container { max-width: 800px; margin: 0 auto; }
+        .logo { font-size: 60px; text-align: center; margin-bottom: 20px; }
+        h1 { text-align: center; font-size: 36px; margin-bottom: 30px; }
+        .info-box { 
+            background: rgba(255,255,255,0.1); 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
         }
-        .logo {
-            font-size: 80px;
-            margin-bottom: 20px;
-            animation: float 3s ease-in-out infinite;
-        }
-        h1 {
-            font-size: 48px;
-            margin-bottom: 20px;
-            font-weight: 300;
-        }
-        .loader {
-            width: 60px;
-            height: 60px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s linear infinite;
-            margin: 40px auto;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-20px); }
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        .status-green { color: #2ecc71; font-weight: bold; }
+        .status-red { color: #e74c3c; font-weight: bold; }
+        a { color: #3498db; text-decoration: none; }
+        a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="logo">🍹</div>
-        <h1>Cocktail Machine</h1>
-        <div class="loader"></div>
-        <p>Starting services...</p>
+        <h1>Cocktail Machine - System Ready</h1>
+        
+        <div class="info-box">
+            <h3>📦 Installation Status</h3>
+            <p>✅ Web dashboard installed and running</p>
+            <p>✅ Nginx web server active</p>
+            <p>✅ Docker backend services configured</p>
+            <p class="status-green">🎯 System Status: ONLINE</p>
+        </div>
+        
+        <div class="info-box">
+            <h3>🌐 Access Points</h3>
+            <p><a href="/">🏠 Main Dashboard</a></p>
+            <p><a href="http://localhost:1880">🔧 Node-RED Interface</a></p>
+            <p><a href="/health">❤️ Health Check</a></p>
+        </div>
+        
+        <div class="info-box">
+            <h3>📱 Usage</h3>
+            <p>• Access this system from any device on your network</p>
+            <p>• Use your phone, tablet, or computer as the interface</p>
+            <p>• No desktop environment needed - pure web-based control</p>
+        </div>
+        
+        <div class="info-box">
+            <h3>🔄 Next Steps</h3>
+            <p>1. Connect to this Pi from another device</p>
+            <p>2. Visit <code>http://[pi-ip-address]</code></p>
+            <p>3. Use the web dashboard to control your cocktail machine</p>
+        </div>
     </div>
 </body>
 </html>
-EOF
+SYSTEM_INFO_EOF
 
-print_status "Kiosk system configured"
+print_status "Web-only setup completed - no desktop environment needed"
 
-# Step 10: Configure kiosk auto-start (same as before)
-print_step "Step 10: Configuring kiosk auto-start..."
+# Step 9: Skip kiosk setup - web-only access
+print_step "Step 9: Configuring web-only access..."
 
-# Configure auto-login with proper session setup
-sudo mkdir -p /etc/lightdm/lightdm.conf.d
-sudo tee /etc/lightdm/lightdm.conf.d/01-autologin.conf > /dev/null << EOF
-[Seat:*]
-autologin-user=$USER
-autologin-user-timeout=0
-user-session=openbox
-greeter-session=lightdm-gtk-greeter
-autologin-session=openbox
-allow-guest=false
-EOF
+print_info "No kiosk setup needed - system will run headless"
+print_info "Dashboard accessible via web browser from any device"
 
-# Create openbox autostart directory and script
-sudo mkdir -p /home/$USER/.config/openbox
-sudo tee /home/$USER/.config/openbox/autostart > /dev/null << 'AUTOSTART_EOF'
-#!/bin/bash
-# Openbox autostart script for cocktail machine kiosk
+print_status "Web-only access configured"
 
-# Set X11 environment
-export DISPLAY=:0
+# Step 10: Configure headless operation
+print_step "Step 10: Configuring headless operation..."
 
-# Copy X11 authorization for user access
-if [ -f "/var/run/lightdm/root/:0" ]; then
-    sudo cp "/var/run/lightdm/root/:0" "/home/$USER/.Xauthority"
-    sudo chown $USER:$USER "/home/$USER/.Xauthority"
-    chmod 600 "/home/$USER/.Xauthority"
-fi
+# Ensure system stays in multi-user mode (no desktop)
+sudo systemctl set-default multi-user.target
 
-# Start unclutter to hide mouse cursor
-unclutter -idle 1 -root &
+print_info "System configured for headless operation"
+print_info "No desktop environment will start - saves resources"
+print_info "All services accessible via web interface"
 
-# Wait a moment for desktop to initialize
-sleep 2
-
-# Start the cocktail machine kiosk
-/home/$USER/.cocktail-machine/kiosk-launcher.sh &
-AUTOSTART_EOF
-
-sudo chown -R $USER:$USER /home/$USER/.config
-sudo chmod +x /home/$USER/.config/openbox/autostart
-
-# Create a script to fix X11 permissions after lightdm starts
-sudo tee /usr/local/bin/fix-x11-permissions.sh > /dev/null << 'PERM_SCRIPT_EOF'
-#!/bin/bash
-# Fix X11 permissions for pi user
-
-# Wait for lightdm to create auth file
-for i in {1..30}; do
-    if [ -f "/var/run/lightdm/root/:0" ]; then
-        break
-    fi
-    sleep 1
-done
-
-# Copy auth file to user directory
-if [ -f "/var/run/lightdm/root/:0" ]; then
-    cp "/var/run/lightdm/root/:0" "/home/pi/.Xauthority"
-    chown pi:pi "/home/pi/.Xauthority"
-    chmod 600 "/home/pi/.Xauthority"
-fi
-PERM_SCRIPT_EOF
-
-sudo chmod +x /usr/local/bin/fix-x11-permissions.sh
-
-# Create systemd service to fix permissions after lightdm
-sudo tee /etc/systemd/system/fix-x11-permissions.service > /dev/null << EOF
-[Unit]
-Description=Fix X11 permissions for pi user
-After=lightdm.service
-Requires=lightdm.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/fix-x11-permissions.sh
-RemainAfterExit=yes
-
-[Install]
-WantedBy=graphical.target
-EOF
-
-sudo systemctl enable fix-x11-permissions.service
-
-# Enable graphical target
-sudo systemctl set-default graphical.target
-
-# Enable lightdm with proper checks
-print_info "Configuring display manager..."
-if sudo systemctl list-unit-files | grep -q lightdm.service; then
-    sudo systemctl enable lightdm
-    print_status "Lightdm service enabled"
-else
-    print_error "Lightdm service not found, but continuing setup..."
-    print_info "Display manager may need manual configuration after reboot"
-fi
-
-# Note: Kiosk startup is now handled by openbox autostart
-# Create a simple monitoring service instead
-sudo tee /etc/systemd/system/cocktail-kiosk-monitor.service > /dev/null << EOF
-[Unit]
-Description=Monitor Cocktail Machine Kiosk
-After=graphical.target lightdm.service
-Wants=lightdm.service
-
-[Service]
-Type=simple
-User=root
-Restart=always
-RestartSec=30
-ExecStart=/bin/bash -c 'while true; do if ! pgrep -f "chromium.*http://localhost" >/dev/null && systemctl is-active lightdm >/dev/null; then logger "Cocktail kiosk not running, desktop should restart it"; fi; sleep 30; done'
-
-[Install]
-WantedBy=graphical.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable cocktail-kiosk-monitor.service
-
-print_status "Kiosk auto-start configured"
+print_status "Headless operation configured"
 
 # Step 11: Testing installation...
 print_step "Step 11: Testing installation..."
@@ -1063,17 +728,18 @@ echo "=================================================="
 echo "🎉 Cocktail Machine Setup Complete!"
 echo "=================================================="
 echo ""
-echo "✅ Production React dashboard installed"
-echo "✅ Nginx web server configured"
+echo "✅ Production React dashboard installed and running"
+echo "✅ Nginx web server configured and started"
 echo "✅ Docker backend services configured"
-echo "✅ Update system installed"
-echo "✅ Kiosk mode configured for Pi display"
-echo "✅ Auto-login configured"
+echo "✅ Update system installed and working"
+echo "✅ Headless operation configured (no desktop needed)"
+echo "✅ Web-only access enabled"
 echo ""
-echo "🌐 Access Points:"
-echo "   • React Dashboard: http://localhost"
-echo "   • Node-RED:        http://localhost:1880"
-echo "   • Health Check:    http://localhost/health"
+echo "🌐 Access Points (from ANY device on your network):"
+echo "   • React Dashboard: http://[pi-ip-address]"
+echo "   • Node-RED:        http://[pi-ip-address]:1880"
+echo "   • Health Check:    http://[pi-ip-address]/health"
+echo "   • System Info:     http://[pi-ip-address]/system-info.html"
 echo ""
 echo "🔄 Update Commands:"
 echo "   • Check updates:   sudo $SCRIPTS_DIR/update_dashboard.sh --check"
@@ -1086,10 +752,13 @@ echo "   • Check nginx:      sudo systemctl status nginx"
 echo "   • Check dashboard:   ls -la /opt/webroot/"
 echo "   • View logs:        journalctl -f"
 echo ""
-echo "🖥️ Kiosk Mode:"
-echo "   • Reboot to activate: sudo reboot"
-echo "   • Manual start: sudo systemctl start cocktail-kiosk-startup"
-echo "   • Check status: sudo systemctl status cocktail-kiosk-startup"
+echo "📱 Usage:"
+echo "   1. This Pi runs HEADLESS (no screen/keyboard needed)"
+echo "   2. Access from phone, tablet, or computer"
+echo "   3. Connect to same WiFi network as the Pi"
+echo "   4. Visit http://[pi-ip-address] in any web browser"
+echo ""
+echo "🔍 Find your Pi's IP address: ip addr show"
 echo ""
 echo "⚠️ If services aren't running:"
 echo "   1. Wait 2-3 minutes after installation"
@@ -1097,10 +766,8 @@ echo "   2. Run: sudo systemctl restart nginx"
 echo "   3. Run: sudo systemctl restart docker"
 echo "   4. Check: curl http://localhost"
 echo ""
-echo "🎯 After reboot, your Pi will display the React dashboard"
-echo "   in full-screen kiosk mode automatically!"
-echo ""
-echo "⏰ Ready to reboot? Run: sudo reboot"
+echo "⚙️ No reboot needed - services are running now!"
+echo "🎉 Access your cocktail machine from any device!"
 echo ""
 echo "📦 Installation completed with script version: $SCRIPT_VERSION ($SCRIPT_BUILD)"
 echo "🕰️ Installation timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
