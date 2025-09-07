@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.1"
-SCRIPT_BUILD="Build-002"
+SCRIPT_VERSION="2025.09.07-v1.0.2"
+SCRIPT_BUILD="Build-003"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -540,11 +540,19 @@ fi
 
 print_status "Backend services startup attempted"
 
-# Step 8: Web-Only Setup (Skip Desktop Environment)
-print_step "Step 8: Setting up web-only mode..."
+# Step 8: Install Minimal Desktop for Pi Screen Display
+print_step "Step 8: Installing minimal desktop for Pi screen display..."
 
-print_info "Skipping desktop environment - using web dashboard only"
-print_info "React dashboard will be accessible via web browser at http://pi-ip"
+# Install only essential packages for browser display
+print_info "Installing minimal X11 and browser..."
+sudo apt-get install -y \
+    --no-install-recommends \
+    xorg \
+    xinit \
+    openbox \
+    chromium-browser
+
+print_info "Skipping display manager - using direct X11 startup"
 
 # Create a simple system info page instead of kiosk
 sudo tee /opt/webroot/system-info.html > /dev/null << 'SYSTEM_INFO_EOF'
@@ -616,13 +624,76 @@ SYSTEM_INFO_EOF
 
 print_status "Web-only setup completed - no desktop environment needed"
 
-# Step 9: Skip kiosk setup - web-only access
-print_step "Step 9: Configuring web-only access..."
+# Step 9: Create Simple Kiosk Startup
+print_step "Step 9: Creating simple kiosk startup..."
 
-print_info "No kiosk setup needed - system will run headless"
-print_info "Dashboard accessible via web browser from any device"
+# Create kiosk directory
+mkdir -p /home/$USER/.cocktail-machine
 
-print_status "Web-only access configured"
+# Create simple kiosk script
+cat > /home/$USER/.cocktail-machine/start-kiosk.sh << 'KIOSK_EOF'
+#!/bin/bash
+# Simple kiosk startup script
+
+# Wait for network and nginx to be ready
+echo "Waiting for network and services..."
+sleep 10
+
+# Wait for nginx to respond
+for i in {1..30}; do
+    if curl -s http://localhost >/dev/null 2>&1; then
+        echo "Dashboard is ready!"
+        break
+    fi
+    sleep 2
+done
+
+# Start X11 and browser directly
+export DISPLAY=:0
+startx /usr/bin/openbox-session &
+sleep 5
+
+# Start chromium in kiosk mode
+DISPLAY=:0 chromium-browser \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-extensions \
+    --disable-plugins \
+    --no-first-run \
+    --disable-dev-shm-usage \
+    --disable-software-rasterizer \
+    http://localhost \
+    >/dev/null 2>&1 &
+
+echo "Kiosk browser started"
+KIOSK_EOF
+
+chmod +x /home/$USER/.cocktail-machine/start-kiosk.sh
+
+# Create systemd service for kiosk
+sudo tee /etc/systemd/system/cocktail-kiosk.service > /dev/null << EOF
+[Unit]
+Description=Cocktail Machine Kiosk Display
+After=network-online.target nginx.service
+Wants=network-online.target
+Requires=nginx.service
+
+[Service]
+Type=simple
+User=$USER
+Environment=HOME=/home/$USER
+ExecStart=/home/$USER/.cocktail-machine/start-kiosk.sh
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable cocktail-kiosk.service
+
+print_status "Simple kiosk startup configured"
 
 # Step 10: Configure headless operation
 print_step "Step 10: Configuring headless operation..."
@@ -732,8 +803,8 @@ echo "✅ Production React dashboard installed and running"
 echo "✅ Nginx web server configured and started"
 echo "✅ Docker backend services configured"
 echo "✅ Update system installed and working"
-echo "✅ Headless operation configured (no desktop needed)"
-echo "✅ Web-only access enabled"
+echo "✅ Simple kiosk browser configured for Pi screen"
+echo "✅ Web access enabled from network devices"
 echo ""
 echo "🌐 Access Points (from ANY device on your network):"
 echo "   • React Dashboard: http://[pi-ip-address]"
@@ -753,8 +824,8 @@ echo "   • Check dashboard:   ls -la /opt/webroot/"
 echo "   • View logs:        journalctl -f"
 echo ""
 echo "📱 Usage:"
-echo "   1. This Pi runs HEADLESS (no screen/keyboard needed)"
-echo "   2. Access from phone, tablet, or computer"
+echo "   1. Pi screen shows dashboard automatically after reboot"
+echo "   2. Also access from phone, tablet, or computer"
 echo "   3. Connect to same WiFi network as the Pi"
 echo "   4. Visit http://[pi-ip-address] in any web browser"
 echo ""
@@ -766,8 +837,10 @@ echo "   2. Run: sudo systemctl restart nginx"
 echo "   3. Run: sudo systemctl restart docker"
 echo "   4. Check: curl http://localhost"
 echo ""
-echo "⚙️ No reboot needed - services are running now!"
-echo "🎉 Access your cocktail machine from any device!"
+echo "🔄 Reboot required to start Pi screen display:"
+echo "   sudo reboot"
+echo ""
+echo "🎉 After reboot: Pi screen will show dashboard + network access available!"
 echo ""
 echo "📦 Installation completed with script version: $SCRIPT_VERSION ($SCRIPT_BUILD)"
 echo "🕰️ Installation timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
