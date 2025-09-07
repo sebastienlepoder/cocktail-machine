@@ -180,6 +180,16 @@ jobs:
         echo "🖥️ Copying kiosk files..."
         [ -d kiosk ] && cp -r kiosk/* prod-deploy/kiosk/ 2>/dev/null || true
         
+        # Copy Node-RED flows
+        echo "🔴 Copying Node-RED flows..."
+        if [ -d node-red ]; then
+          mkdir -p prod-deploy/nodered
+          cp -r node-red/* prod-deploy/nodered/ 2>/dev/null || true
+          echo "✅ Node-RED flows copied to production package"
+        else
+          echo "⚠️ No Node-RED directory found, skipping"
+        fi
+        
         # Make all scripts executable
         find prod-deploy/scripts -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
         
@@ -293,6 +303,7 @@ jobs:
         ## 📦 Contents
         
         - **`web/`** - Dashboard application (version ${{ steps.version.outputs.version }})
+        - **`nodered/`** - Node-RED flows and configuration
         - **`scripts/`** - Installation and update scripts  
         - **`kiosk/`** - Kiosk mode configuration
         - **`web.tar.gz`** - Compressed deployment archive
