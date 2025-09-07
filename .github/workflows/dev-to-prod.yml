@@ -86,32 +86,64 @@ jobs:
         fi
       continue-on-error: true
         
-    - name: 📋 Create Production Package
+    - name: 📦 Create Production Package
       run: |
         echo "📦 Creating production deployment package..."
         
         # Create production directory structure
         mkdir -p prod-deploy/{web,scripts,kiosk}
         
-        # Copy built web files (with multiple fallback options)
-        if [ -d web/dist ] && [ "$(find web/dist -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-          echo "📁 Copying from web/dist/"
-          cp -r web/dist/. prod-deploy/web/
-        elif [ -d web/build ] && [ "$(find web/build -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-          echo "📁 Copying from web/build/"
-          cp -r web/build/. prod-deploy/web/
-        elif [ -d web/out ] && [ "$(find web/out -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-          echo "📁 Copying from web/out/"
-          cp -r web/out/. prod-deploy/web/
-        elif [ -d web/public ] && [ "$(find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
-          echo "📁 Copying from web/public/ (excluding .gitkeep)"
-          find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec cp -r {} prod-deploy/web/ \;
-        elif [ -d web ] && [ "$(find web -mindepth 1 -maxdepth 1 -type f 2>/dev/null)" ]; then
-          echo "📁 Copying web source files"
-          find web -mindepth 1 -maxdepth 1 -type f -exec cp {} prod-deploy/web/ \;
+        # Check for pre-packaged web dashboard from cocktail-slider-display repo
+        if [ -f "web/LATEST_DEPLOYMENT.json" ] && [ -d "web/packages" ]; then
+          echo "🎨 Found pre-packaged web dashboard deployment"
+          
+          # Extract info from deployment metadata
+          PACKAGE_FILE=$(jq -r '.package_file' web/LATEST_DEPLOYMENT.json)
+          WEB_VERSION=$(jq -r '.latest_version' web/LATEST_DEPLOYMENT.json)
+          RELEASE_NOTES=$(jq -r '.release_notes' web/LATEST_DEPLOYMENT.json)
+          
+          echo "📦 Extracting dashboard package: $PACKAGE_FILE"
+          echo "🎯 Dashboard version: $WEB_VERSION"
+          
+          # Extract the packaged dashboard to production
+          if [ -f "web/packages/$PACKAGE_FILE" ]; then
+            tar -xzf "web/packages/$PACKAGE_FILE" -C prod-deploy/web/
+            echo "✅ Successfully extracted pre-built dashboard"
+            
+            # Update release notes to include web dashboard info
+            if [ -n "$RELEASE_NOTES" ] && [ "$RELEASE_NOTES" != "null" ]; then
+              echo "web_release_notes=$RELEASE_NOTES" >> $GITHUB_ENV
+              echo "web_version=$WEB_VERSION" >> $GITHUB_ENV
+            fi
+          else
+            echo "❌ Package file not found: web/packages/$PACKAGE_FILE"
+            echo "📂 Available packages:"
+            ls -la web/packages/ || echo "No packages directory"
+            exit 1
+          fi
+          
         else
-          echo "📄 Creating placeholder dashboard"
-          cat > prod-deploy/web/index.html << 'EOF'
+          echo "📁 No pre-packaged dashboard found, checking for built web files..."
+          
+          # Fallback: Copy built web files (with multiple fallback options)
+          if [ -d web/dist ] && [ "$(find web/dist -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+            echo "📁 Copying from web/dist/"
+            cp -r web/dist/. prod-deploy/web/
+          elif [ -d web/build ] && [ "$(find web/build -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+            echo "📁 Copying from web/build/"
+            cp -r web/build/. prod-deploy/web/
+          elif [ -d web/out ] && [ "$(find web/out -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+            echo "📁 Copying from web/out/"
+            cp -r web/out/. prod-deploy/web/
+          elif [ -d web/public ] && [ "$(find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
+            echo "📁 Copying from web/public/ (excluding .gitkeep)"
+            find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec cp -r {} prod-deploy/web/ \;
+          elif [ -d web ] && [ "$(find web -mindepth 1 -maxdepth 1 -type f 2>/dev/null)" ]; then
+            echo "📁 Copying web source files"
+            find web -mindepth 1 -maxdepth 1 -type f -exec cp {} prod-deploy/web/ \;
+          else
+            echo "📄 Creating placeholder dashboard"
+            cat > prod-deploy/web/index.html << 'EOF'
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -136,6 +168,7 @@ jobs:
         </body>
         </html>
         EOF
+          fi
         fi
         
         # Copy deployment scripts

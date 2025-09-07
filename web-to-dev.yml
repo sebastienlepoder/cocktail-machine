@@ -1,0 +1,236 @@
+name: 🎨 Web Dashboard → Dev Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'minor'
+        type: choice
+        options:
+        - patch
+        - minor 
+        - major
+      release_notes:
+        description: 'Release notes (what changed in the dashboard)'
+        required: true
+        type: string
+      force_deploy:
+        description: 'Force deploy even if no changes detected'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  build-and-deploy-dashboard:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout web dashboard source
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        
+    - name: 🔍 Get commit info
+      id: commit_info
+      run: |
+        echo "short_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "commit_msg=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
+        echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+        echo "date=$(date -u +"%Y.%m.%d")" >> $GITHUB_OUTPUT
+        echo "timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+        
+    - name: 📊 Generate version number
+      id: version
+      run: |
+        # Generate semantic version based on release type
+        if [ "${{ github.event.inputs.release_type }}" == "major" ]; then
+          VERSION_NUM="v${{ steps.commit_info.outputs.date }}.major-${{ steps.commit_info.outputs.short_sha }}"
+        elif [ "${{ github.event.inputs.release_type }}" == "minor" ]; then
+          VERSION_NUM="v${{ steps.commit_info.outputs.date }}.minor-${{ steps.commit_info.outputs.short_sha }}"
+        else
+          VERSION_NUM="v${{ steps.commit_info.outputs.date }}.patch-${{ steps.commit_info.outputs.short_sha }}"
+        fi
+        
+        echo "version=$VERSION_NUM" >> $GITHUB_OUTPUT
+        echo "Generated version: $VERSION_NUM"
+        
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: 📦 Install dependencies
+      run: |
+        echo "Installing npm dependencies..."
+        npm ci
+        
+    - name: 🏗️ Build dashboard
+      run: |
+        echo "Building React dashboard for production..."
+        npm run build
+        
+        # Verify build output
+        if [ ! -d "build" ] && [ ! -d "dist" ]; then
+          echo "❌ Build failed - no build/dist directory found!"
+          exit 1
+        fi
+        
+        # Use build or dist directory (React typically uses 'build')
+        if [ -d "build" ]; then
+          BUILD_DIR="build"
+        else
+          BUILD_DIR="dist"
+        fi
+        
+        echo "build_dir=$BUILD_DIR" >> $GITHUB_ENV
+        
+        # Show build contents
+        echo "📁 Build directory contents:"
+        ls -la $BUILD_DIR/
+        
+    - name: 📋 Create version manifest
+      run: |
+        # Create version information file
+        cat > dashboard-version.json << EOF
+        {
+          "dashboard": {
+            "version": "${{ steps.version.outputs.version }}",
+            "build_date": "${{ steps.commit_info.outputs.timestamp }}",
+            "source_commit": "${{ steps.commit_info.outputs.short_sha }}",
+            "source_repo": "cocktail-slider-display",
+            "release_type": "${{ github.event.inputs.release_type }}",
+            "release_notes": "${{ github.event.inputs.release_notes }}",
+            "built_by": "GitHub Actions",
+            "node_version": "$(node --version)",
+            "npm_version": "$(npm --version)"
+          }
+        }
+        EOF
+        
+        echo "📄 Version manifest:"
+        cat dashboard-version.json
+        
+    - name: 📦 Package dashboard
+      run: |
+        echo "Creating dashboard package..."
+        
+        # Create package directory
+        mkdir -p dashboard-package
+        
+        # Copy built dashboard
+        cp -r ${{ env.build_dir }}/* dashboard-package/
+        
+        # Add version file to package
+        cp dashboard-version.json dashboard-package/
+        
+        # Create tarball
+        tar -czf dashboard-${{ steps.version.outputs.version }}.tar.gz -C dashboard-package .
+        
+        # Verify package
+        echo "📦 Package contents:"
+        tar -tzf dashboard-${{ steps.version.outputs.version }}.tar.gz | head -20
+        
+        # Store package info
+        echo "package_file=dashboard-${{ steps.version.outputs.version }}.tar.gz" >> $GITHUB_ENV
+        echo "package_size=$(ls -lh dashboard-${{ steps.version.outputs.version }}.tar.gz | awk '{print $5}')" >> $GITHUB_ENV
+        
+    - name: 📥 Checkout dev repository
+      uses: actions/checkout@v4
+      with:
+        repository: sebastienlepoder/cocktail-machine
+        token: ${{ secrets.DEPLOY_TOKEN }}
+        path: cocktail-machine-dev
+        
+    - name: 🚀 Deploy to dev repository
+      working-directory: cocktail-machine-dev
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Actions (Web Deploy)"
+        
+        # Create web directory if it doesn't exist
+        mkdir -p web/packages
+        
+        # Copy the packaged dashboard
+        cp ../${{ env.package_file }} web/packages/
+        
+        # Create/update web deployment metadata
+        cat > web/LATEST_DEPLOYMENT.json << EOF
+        {
+          "latest_version": "${{ steps.version.outputs.version }}",
+          "package_file": "${{ env.package_file }}",
+          "package_size": "${{ env.package_size }}",
+          "deployment_date": "${{ steps.commit_info.outputs.timestamp }}",
+          "source_repo": "cocktail-slider-display",
+          "source_commit": "${{ steps.commit_info.outputs.short_sha }}",
+          "release_type": "${{ github.event.inputs.release_type }}",
+          "release_notes": "${{ github.event.inputs.release_notes }}",
+          "deployed_by": "GitHub Actions Web Deploy"
+        }
+        EOF
+        
+        # Update the main VERSION file for the web component
+        echo "${{ steps.version.outputs.version }}" > web/VERSION
+        
+        # Add files to git
+        git add web/
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          if [ "${{ github.event.inputs.force_deploy }}" == "true" ]; then
+            echo "⚠️ No changes detected, but force deploy requested"
+            # Create empty commit
+            git commit --allow-empty -m "🎨 Force deploy web dashboard ${{ steps.version.outputs.version }}
+
+        Package: ${{ env.package_file }} (${{ env.package_size }})
+        Release: ${{ github.event.inputs.release_type }}
+        Source: cocktail-slider-display@${{ steps.commit_info.outputs.short_sha }}
+        
+        ${{ github.event.inputs.release_notes }}"
+          else
+            echo "❌ No changes detected and force deploy not requested"
+            echo "The web dashboard may already be up to date"
+            exit 1
+          fi
+        else
+          # Commit changes
+          git commit -m "🎨 Deploy web dashboard ${{ steps.version.outputs.version }}
+
+        Package: ${{ env.package_file }} (${{ env.package_size }})
+        Release: ${{ github.event.inputs.release_type }}
+        Source: cocktail-slider-display@${{ steps.commit_info.outputs.short_sha }}
+        
+        📝 Release Notes:
+        ${{ github.event.inputs.release_notes }}
+        
+        🔧 Build Info:
+        - Built: ${{ steps.commit_info.outputs.timestamp }}
+        - Author: ${{ steps.commit_info.outputs.author }}
+        - Commit: ${{ steps.commit_info.outputs.commit_msg }}"
+        fi
+        
+        # Push changes
+        git push origin main
+        
+    - name: ✅ Deployment Summary
+      run: |
+        echo "🎉 Web Dashboard Deployment Complete!"
+        echo ""
+        echo "📊 Deployment Details:"
+        echo "  Version: ${{ steps.version.outputs.version }}"
+        echo "  Package: ${{ env.package_file }} (${{ env.package_size }})"
+        echo "  Release Type: ${{ github.event.inputs.release_type }}"
+        echo "  Source Commit: ${{ steps.commit_info.outputs.short_sha }}"
+        echo "  Deployed to: cocktail-machine (dev repository)"
+        echo ""
+        echo "📝 Release Notes:"
+        echo "${{ github.event.inputs.release_notes }}"
+        echo ""
+        echo "🚀 Next Steps:"
+        echo "1. Review deployment in cocktail-machine repository"
+        echo "2. Test the updated dashboard"
+        echo "3. When ready, use 'Dev → Prod Deployment' workflow"
+        echo "4. Pi users will get automatic update notifications"
