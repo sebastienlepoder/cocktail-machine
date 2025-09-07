@@ -41,11 +41,21 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
-# Step 1: System Update
-print_step "Step 1: Updating system packages..."
+# Step 1: System Update and Clock Sync
+print_step "Step 1: Updating system and syncing clock..."
+
+# Sync system clock to fix timestamp warnings
+print_info "Synchronizing system clock..."
 sudo apt-get update -y
+sudo apt-get install -y ntp ntpdate
+sudo systemctl stop ntp 2>/dev/null || true
+sudo ntpdate -s time.nist.gov 2>/dev/null || sudo ntpdate -s pool.ntp.org 2>/dev/null || print_info "Clock sync skipped"
+sudo systemctl start ntp 2>/dev/null || true
+sudo systemctl enable ntp 2>/dev/null || true
+
+print_info "Upgrading packages..."
 sudo apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-print_status "System updated"
+print_status "System updated and clock synchronized"
 
 # Step 2: Install essential packages + nginx
 print_step "Step 2: Installing essential packages..."
@@ -62,20 +72,43 @@ print_status "Essential packages installed"
 # Step 3: Install Docker (for Node-RED and other services)
 print_step "Step 3: Installing Docker..."
 if ! command -v docker &> /dev/null; then
+    # Install Docker
     curl -fsSL https://get.docker.com -o get-docker.sh
     sudo sh get-docker.sh
     sudo usermod -aG docker $USER
     rm get-docker.sh
     
-    # Install Docker Compose
-    sudo apt-get install -y docker-compose-plugin docker-compose
+    # Wait for Docker installation to complete
+    sleep 5
+    
+    # Install Docker Compose (try multiple methods)
+    print_info "Installing Docker Compose..."
+    if ! sudo apt-get install -y docker-compose-plugin 2>/dev/null; then
+        print_info "Plugin installation failed, trying legacy docker-compose..."
+        sudo apt-get install -y docker-compose 2>/dev/null || {
+            print_info "APT installation failed, downloading docker-compose binary..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        }
+    fi
+    
     print_status "Docker installed successfully"
 else
     print_status "Docker already installed"
 fi
 
-sudo systemctl enable docker
-sudo systemctl start docker
+# Ensure Docker service is available and start it
+print_info "Starting Docker service..."
+if sudo systemctl list-unit-files | grep -q docker.service; then
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    print_status "Docker service started"
+else
+    print_info "Docker service not found, waiting for installation to complete..."
+    sleep 10
+    sudo systemctl enable docker 2>/dev/null || true
+    sudo systemctl start docker 2>/dev/null || true
+fi
 
 # Step 4: Download Production React Dashboard
 print_step "Step 4: Downloading production React dashboard..."
@@ -130,6 +163,9 @@ print_status "Production scripts installed"
 # Step 6: Configure nginx to serve React dashboard
 print_step "Step 6: Configuring nginx..."
 
+# Ensure nginx directories exist
+sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
 # Create nginx config for React dashboard
 sudo tee /etc/nginx/sites-available/cocktail-machine > /dev/null << EOF
 server {
@@ -161,11 +197,26 @@ sudo ln -sf /etc/nginx/sites-available/cocktail-machine /etc/nginx/sites-enabled
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Test nginx config and restart
-sudo nginx -t
-sudo systemctl enable nginx
-sudo systemctl restart nginx
+print_info "Testing nginx configuration..."
+if sudo nginx -t 2>/dev/null; then
+    print_status "Nginx config is valid"
+else
+    print_error "Nginx config test failed, but continuing..."
+fi
 
-print_status "Nginx configured and started"
+# Start nginx service
+print_info "Starting nginx service..."
+if sudo systemctl list-unit-files | grep -q nginx.service; then
+    sudo systemctl enable nginx
+    sudo systemctl restart nginx
+    print_status "Nginx service started"
+else
+    print_error "Nginx service not found! Installation may have failed."
+    print_info "Attempting to start nginx directly..."
+    sudo nginx 2>/dev/null || print_error "Failed to start nginx directly"
+fi
+
+print_status "Nginx configuration completed"
 
 # Step 7: Set up Docker containers for Node-RED and MQTT
 print_step "Step 7: Setting up backend services..."
@@ -236,9 +287,25 @@ EOF
 
 # Start backend services
 cd "$PROJECT_DIR"
-docker-compose up -d
 
-print_status "Backend services started"
+print_info "Starting Docker containers..."
+# Try different docker-compose commands
+if command -v docker-compose &> /dev/null; then
+    docker-compose up -d
+elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+    docker compose up -d
+else
+    print_error "Docker Compose not found! Trying to install it..."
+    sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    sudo chmod +x /usr/local/bin/docker-compose
+    if command -v docker-compose &> /dev/null; then
+        docker-compose up -d
+    else
+        print_error "Failed to install Docker Compose. Backend services will not start."
+    fi
+fi
+
+print_status "Backend services startup attempted"
 
 # Step 8: Install X11 and Desktop Environment for kiosk
 print_step "Step 8: Installing X11 and minimal desktop..."
