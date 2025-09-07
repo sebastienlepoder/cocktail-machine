@@ -440,6 +440,23 @@ sudo chown -R www-data:www-data "$WEBROOT_DIR"
 sudo chmod -R 755 "$WEBROOT_DIR"
 sudo find "$WEBROOT_DIR" -type f -exec chmod 644 {} \;
 
+# Create assets directory to prevent 404 errors
+print_info "Creating assets directory structure..."
+sudo mkdir -p "$WEBROOT_DIR/src/assets/images"
+sudo mkdir -p "$WEBROOT_DIR/assets/images"
+sudo mkdir -p "$WEBROOT_DIR/static/assets/images"
+
+# Create placeholder images to prevent 404 errors
+print_info "Creating placeholder images..."
+# Create a simple 1x1 transparent PNG as placeholder
+echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc````\x00\x00\x00\x05\x00\x01\r\n\x9d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' | sudo tee "$WEBROOT_DIR/src/assets/images/placeholder.png" > /dev/null
+sudo cp "$WEBROOT_DIR/src/assets/images/placeholder.png" "$WEBROOT_DIR/assets/images/placeholder.png" 2>/dev/null || true
+sudo cp "$WEBROOT_DIR/src/assets/images/placeholder.png" "$WEBROOT_DIR/static/assets/images/placeholder.png" 2>/dev/null || true
+
+# Create favicon.ico
+print_info "Creating favicon..."
+echo -e '\x00\x00\x01\x00\x01\x00\x10\x10\x00\x00\x01\x00 \x00h\x04\x00\x00\x16\x00\x00\x00(\x00\x00\x00\x10\x00\x00\x00 \x00\x00\x00\x01\x00 \x00\x00\x00\x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00' | sudo tee "$WEBROOT_DIR/favicon.ico" > /dev/null
+
 # Verify files were copied correctly
 print_info "Verifying dashboard installation..."
 if [ -f "$WEBROOT_DIR/index.html" ]; then
@@ -476,11 +493,14 @@ print_status "Production scripts installed"
 # Step 6: Configure nginx to serve React dashboard
 print_step "Step 6: Configuring nginx..."
 
+# Define variables
+NGINX_SITE_NAME="cocktail-machine"
+
 # Ensure nginx directories exist
 sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 
 # Create nginx config for React dashboard
-sudo tee /etc/nginx/sites-available/$NGINX_SITE_NAME > /dev/null << EOF
+sudo tee "/etc/nginx/sites-available/$NGINX_SITE_NAME" > /dev/null << EOF
 server {
     listen 80;
     server_name _;
@@ -506,7 +526,7 @@ server {
 EOF
 
 # Enable the site
-sudo ln -sf /etc/nginx/sites-available/$NGINX_SITE_NAME /etc/nginx/sites-enabled/
+sudo ln -sf "/etc/nginx/sites-available/cocktail-machine" "/etc/nginx/sites-enabled/cocktail-machine"
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # Test nginx config and restart
@@ -536,7 +556,6 @@ print_step "Step 7: Setting up backend services..."
 
 # Create project directory (same structure regardless of source repo)
 PROJECT_DIR="/home/$USER/cocktail-machine"
-NGINX_SITE_NAME="cocktail-machine"
 KIOSK_DIR="/home/$USER/.cocktail-machine"
 mkdir -p "$PROJECT_DIR"
 
@@ -590,8 +609,11 @@ EOF
 # Create directories for services
 mkdir -p "$PROJECT_DIR"/{mosquitto/{config,data,log},nodered/data}
 
+# Set proper permissions for mosquitto directories
+chmod -R 755 "$PROJECT_DIR/mosquitto"
+
 # Create mosquitto config
-cat > "$PROJECT_DIR/mosquitto/config/mosquitto.conf" << 'EOF'
+sudo tee "$PROJECT_DIR/mosquitto/config/mosquitto.conf" > /dev/null << 'EOF'
 listener 1883
 allow_anonymous true
 persistence true
