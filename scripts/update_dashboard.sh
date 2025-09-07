@@ -119,7 +119,24 @@ download_and_extract() {
     rm -rf "$WEBROOT"/*
     cp -r web/* "$WEBROOT/"
     
-    # Set proper permissions
+    # Also copy to Docker web directory if it exists
+    DOCKER_WEB_DIR="/home/pi/cocktail-machine/web"
+    if [ -d "$DOCKER_WEB_DIR" ]; then
+        print_info "Updating Docker web directory"
+        rm -rf "$DOCKER_WEB_DIR"/*
+        cp -r web/* "$DOCKER_WEB_DIR/"
+        chown -R pi:pi "$DOCKER_WEB_DIR" 2>/dev/null || true
+        chmod -R 755 "$DOCKER_WEB_DIR"
+        
+        # Restart Docker web container if docker-compose is available
+        if [ -f "/home/pi/cocktail-machine/deployment/docker-compose.yml" ]; then
+            print_info "Restarting Docker web container"
+            cd /home/pi/cocktail-machine/deployment
+            docker-compose restart web-dashboard 2>/dev/null || true
+        fi
+    fi
+    
+    # Set proper permissions for webroot
     chown -R www-data:www-data "$WEBROOT" 2>/dev/null || true
     chmod -R 755 "$WEBROOT"
     
