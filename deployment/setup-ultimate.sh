@@ -543,6 +543,7 @@ sudo apt-get install -y \
     --no-install-recommends \
     xserver-xorg \
     xserver-xorg-video-fbdev \
+    xserver-xorg-legacy \
     xorg \
     openbox \
     x11-xserver-utils \
@@ -564,7 +565,39 @@ else
     print_error "Failed to install chromium browser"
 fi
 
-print_status "Desktop environment installation completed"
+# Configure X11 for Raspberry Pi graphics
+print_info "Configuring X11 for Raspberry Pi..."
+sudo mkdir -p /etc/X11/xorg.conf.d
+
+# Create X11 configuration for Raspberry Pi
+sudo tee /etc/X11/xorg.conf.d/99-fbdev.conf > /dev/null << 'X11_CONF_EOF'
+Section "Device"
+    Identifier "Raspberry Pi Framebuffer"
+    Driver "fbdev"
+    Option "fbdev" "/dev/fb0"
+EndSection
+
+Section "Screen"
+    Identifier "Default Screen"
+    Device "Raspberry Pi Framebuffer"
+EndSection
+X11_CONF_EOF
+
+# Alternative configuration using modesetting driver
+sudo tee /etc/X11/xorg.conf.d/98-pitft.conf > /dev/null << 'X11_ALT_CONF_EOF'
+Section "Device"
+    Identifier "Card0"
+    Driver "modesetting"
+    Option "kmsdev" "/dev/dri/card1"
+EndSection
+X11_ALT_CONF_EOF
+
+# Allow X11 to be started by any user (needed for lightdm)
+sudo dpkg-reconfigure -f noninteractive xserver-xorg-legacy
+echo 'allowed_users=anybody' | sudo tee /etc/X11/Xwrapper.config > /dev/null
+echo 'needs_root_rights=yes' | sudo tee -a /etc/X11/Xwrapper.config > /dev/null
+
+print_status "Desktop environment installed and configured"
 
 # Step 9: Create kiosk system
 print_step "Step 9: Setting up kiosk system..."
