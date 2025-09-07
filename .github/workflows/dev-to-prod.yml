@@ -86,159 +86,59 @@ jobs:
         fi
       continue-on-error: true
         
-    - name: 📦 Create Production Package
+    - name: 📦 Create Production Package (Mirror Dev Repo)
       run: |
-        echo "📦 Creating production deployment package..."
+        echo "📦 Creating production deployment package (exact copy of dev repo)..."
         
-        # Create production directory structure
-        mkdir -p prod-deploy/{web,scripts,kiosk}
+        # Create production directory - exact mirror of dev
+        mkdir -p prod-deploy
         
-        # Check for pre-packaged web dashboard from cocktail-slider-display repo
-        if [ -f "web/LATEST_DEPLOYMENT.json" ] && [ -d "web/packages" ]; then
-          echo "🎨 Found pre-packaged web dashboard deployment"
-          
-          # Extract info from deployment metadata
-          PACKAGE_FILE=$(jq -r '.package_file' web/LATEST_DEPLOYMENT.json)
-          WEB_VERSION=$(jq -r '.latest_version' web/LATEST_DEPLOYMENT.json)
-          RELEASE_NOTES=$(jq -r '.release_notes' web/LATEST_DEPLOYMENT.json)
-          
-          echo "📦 Extracting dashboard package: $PACKAGE_FILE"
-          echo "🎯 Dashboard version: $WEB_VERSION"
-          
-          # Extract the packaged dashboard to production
-          if [ -f "web/packages/$PACKAGE_FILE" ]; then
-            tar -xzf "web/packages/$PACKAGE_FILE" -C prod-deploy/web/
-            echo "✅ Successfully extracted pre-built dashboard"
-            
-            # Update release notes to include web dashboard info
-            if [ -n "$RELEASE_NOTES" ] && [ "$RELEASE_NOTES" != "null" ]; then
-              echo "web_release_notes=$RELEASE_NOTES" >> $GITHUB_ENV
-              echo "web_version=$WEB_VERSION" >> $GITHUB_ENV
-            fi
-          else
-            echo "❌ Package file not found: web/packages/$PACKAGE_FILE"
-            echo "📂 Available packages:"
-            ls -la web/packages/ || echo "No packages directory"
-            exit 1
-          fi
-          
-        else
-          echo "📁 No pre-packaged dashboard found, checking for built web files..."
-          
-          # Fallback: Copy built web files (with multiple fallback options)
-          if [ -d web/dist ] && [ "$(find web/dist -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-            echo "📁 Copying from web/dist/"
-            cp -r web/dist/. prod-deploy/web/
-          elif [ -d web/build ] && [ "$(find web/build -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-            echo "📁 Copying from web/build/"
-            cp -r web/build/. prod-deploy/web/
-          elif [ -d web/out ] && [ "$(find web/out -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-            echo "📁 Copying from web/out/"
-            cp -r web/out/. prod-deploy/web/
-          elif [ -d web/public ] && [ "$(find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
-            echo "📁 Copying from web/public/ (excluding .gitkeep)"
-            find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec cp -r {} prod-deploy/web/ \;
-          elif [ -d web ] && [ "$(find web -mindepth 1 -maxdepth 1 -type f 2>/dev/null)" ]; then
-            echo "📁 Copying web source files"
-            find web -mindepth 1 -maxdepth 1 -type f -exec cp {} prod-deploy/web/ \;
-          else
-            echo "📄 Creating placeholder dashboard"
-            cat > prod-deploy/web/index.html << 'EOF'
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>🍹 Cocktail Machine</title>
-            <style>
-                body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; min-height: 100vh; margin: 0; }
-                h1 { font-size: 3em; margin-bottom: 20px; }
-                p { font-size: 1.2em; margin-bottom: 30px; }
-                .status { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; }
-            </style>
-        </head>
-        <body>
-            <h1>🍹 Cocktail Machine</h1>
-            <div class="status">
-                <h2>System Ready</h2>
-                <p>Your cocktail machine dashboard will be available soon!</p>
-                <p><strong>Version:</strong> ${{ steps.version.outputs.version }}</p>
-            </div>
-            <p><a href="http://localhost:1880/ui" style="color: #fff;">Node-RED Dashboard</a></p>
-        </body>
-        </html>
-        EOF
-          fi
-        fi
+        # Copy entire repository structure as-is
+        echo "💷 Copying entire dev repository structure..."
         
-        # Copy deployment scripts
-        echo "📜 Copying scripts..."
-        [ -d scripts ] && cp -r scripts/* prod-deploy/scripts/ 2>/dev/null || true
-        [ -d deployment ] && find deployment -name "*.sh" -exec cp {} prod-deploy/scripts/ \; 2>/dev/null || true
+        # Copy all directories and files, preserving structure
+        [ -d web ] && cp -r web prod-deploy/ || echo "⚠️ No web directory"
+        [ -d node-red ] && cp -r node-red prod-deploy/ || echo "⚠️ No node-red directory"
+        [ -d scripts ] && cp -r scripts prod-deploy/ || echo "⚠️ No scripts directory"
+        [ -d deployment ] && cp -r deployment prod-deploy/ || echo "⚠️ No deployment directory"
+        [ -d kiosk ] && cp -r kiosk prod-deploy/ || echo "⚠️ No kiosk directory"
+        [ -d esp32 ] && cp -r esp32 prod-deploy/ || echo "⚠️ No esp32 directory"
+        [ -d data ] && cp -r data prod-deploy/ || echo "⚠️ No data directory"
+        [ -d docs ] && cp -r docs prod-deploy/ || echo "⚠️ No docs directory"
+        [ -d config ] && cp -r config prod-deploy/ || echo "⚠️ No config directory"
+        [ -d src ] && cp -r src prod-deploy/ || echo "⚠️ No src directory"
+        [ -d tests ] && cp -r tests prod-deploy/ || echo "⚠️ No tests directory"
         
-        # Copy kiosk files
-        echo "🖥️ Copying kiosk files..."
-        [ -d kiosk ] && cp -r kiosk/* prod-deploy/kiosk/ 2>/dev/null || true
-        
-        # Copy Node-RED flows
-        echo "🔴 Copying Node-RED flows..."
-        if [ -d node-red ]; then
-          mkdir -p prod-deploy/nodered
-          cp -r node-red/* prod-deploy/nodered/ 2>/dev/null || true
-          echo "✅ Node-RED flows copied to production package"
-        else
-          echo "⚠️ No Node-RED directory found, skipping"
-        fi
+        # Copy root files
+        cp *.md prod-deploy/ 2>/dev/null || echo "⚠️ No markdown files to copy"
+        cp *.yml prod-deploy/ 2>/dev/null || echo "⚠️ No yaml files to copy"
+        cp *.json prod-deploy/ 2>/dev/null || echo "⚠️ No json files to copy"
+        cp *.txt prod-deploy/ 2>/dev/null || echo "⚠️ No text files to copy"
+        cp *.sh prod-deploy/ 2>/dev/null || echo "⚠️ No shell scripts in root to copy"
+        cp .gitignore prod-deploy/ 2>/dev/null || echo "⚠️ No .gitignore to copy"
         
         # Make all scripts executable
-        find prod-deploy/scripts -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+        find prod-deploy -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
         
-        # Create production VERSION file
-        echo "${{ steps.version.outputs.version }}" > prod-deploy/web/VERSION
+        # Add version info
+        echo "${{ steps.version.outputs.version }}" > prod-deploy/VERSION
         
-        # Create production versions.json
-        cat > prod-deploy/web/versions.json << EOF
+        # Create versions.json for update system
+        cat > prod-deploy/versions.json << EOF
         {
-          "dashboard": {
-            "latest": "${{ steps.version.outputs.version }}",
-            "artifact": "web.tar.gz",
-            "notes": [
-              "${{ github.event.inputs.release_notes }}",
-              "Released on ${{ steps.version.outputs.timestamp }}",
-              "Built from dev commit $(git rev-parse --short HEAD)",
-              "Release type: ${{ github.event.inputs.release_type }}"
-            ]
-          },
-          "modules": {
-            "latest": "v1.0.0",
-            "notes": [
-              "ESP32 bottle module firmware",
-              "MQTT communication protocol",
-              "Pump control and liquid level sensing"
-            ]
-          },
-          "backend": {
-            "latest": "v1.0.0", 
-            "notes": [
-              "Node-RED cocktail control flow",
-              "MQTT broker and dashboard API",
-              "Module management system"
-            ]
-          },
-          "release": {
-            "type": "${{ github.event.inputs.release_type }}",
-            "timestamp": "${{ steps.version.outputs.timestamp }}",
-            "dev_repo": "${{ env.DEV_REPO }}",
-            "dev_commit": "$(git rev-parse HEAD)"
-          }
+          "latest": "${{ steps.version.outputs.version }}",
+          "release_type": "${{ github.event.inputs.release_type }}",
+          "release_notes": "${{ github.event.inputs.release_notes }}",
+          "timestamp": "${{ steps.version.outputs.timestamp }}",
+          "dev_repo": "${{ env.DEV_REPO }}",
+          "dev_commit": "$(git rev-parse HEAD)",
+          "dev_commit_short": "$(git rev-parse --short HEAD)"
         }
         EOF
         
-        # Create compressed archive
         cd prod-deploy
-        tar -czf web.tar.gz web/
         ls -la
-        echo "✅ Production package created successfully!"
+        echo "✅ Production package created (exact mirror of dev repository)!"
         
     - name: 📤 Checkout Production Repository
       uses: actions/checkout@v4

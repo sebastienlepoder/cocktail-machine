@@ -24,19 +24,15 @@ print_error() { echo -e "${RED}✗${NC} $1"; }
 print_info() { echo -e "${YELLOW}ℹ${NC} $1"; }
 print_step() { echo -e "${BLUE}►${NC} $1"; }
 
-# Configuration - Repository mode detection
-# Default to dev mode unless explicitly set to production
-if [ "${COCKTAIL_PROD_MODE:-}" = "true" ]; then
-    # Explicitly set to production mode
-    print_info "🚀 Production mode - using production repository"
-    DEPLOY_REPO="sebastienlepoder/cocktail-machine-prod"
-    DEV_MODE=false
-else
-    # Default to development mode
-    print_info "🛠️ Development mode - using dev repository for all downloads"
+# Configuration - Auto-detect repository based on script source
+if [[ "$(curl -s "$0" 2>/dev/null || echo '')" == *"cocktail-machine-dev"* ]] || [[ "$0" == *"cocktail-machine-dev"* ]]; then
+    # Running from dev repo
     DEPLOY_REPO="sebastienlepoder/cocktail-machine-dev"
-    DEV_MODE=true
-    print_info "Node-RED flows and dashboard will be downloaded from dev repo"
+    print_info "🛠️ Using development repository (cocktail-machine-dev)"
+else
+    # Running from prod repo or direct URL
+    DEPLOY_REPO="sebastienlepoder/cocktail-machine-prod"
+    print_info "🚀 Using production repository (cocktail-machine-prod)"
 fi
 
 BRANCH="main"
@@ -160,58 +156,129 @@ sudo mkdir -p "$WEBROOT_DIR" "$SCRIPTS_DIR"
 sudo chown -R www-data:www-data "$WEBROOT_DIR"
 sudo chmod -R 755 "$WEBROOT_DIR"
 
-# Download the production dashboard package
-print_info "Downloading latest dashboard from production repository..."
-DASHBOARD_URL="https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/web.tar.gz"
+# Create simple placeholder dashboard (same for both dev and prod)
+print_info "Creating cocktail machine dashboard..."
+mkdir -p /tmp/web
 
-# Clean up any previous downloads
-rm -rf /tmp/dashboard.tar.gz /tmp/web 2>/dev/null || true
-
-# Download with better error handling
-print_info "Fetching dashboard package..."
-if curl -L -f -o /tmp/dashboard.tar.gz "$DASHBOARD_URL"; then
-    print_status "Dashboard package downloaded successfully"
-else
-    print_error "Failed to download dashboard package from $DASHBOARD_URL"
-    print_info "Attempting alternative download method..."
+cat > /tmp/web/index.html << 'DASHBOARD_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍹 Cocktail Machine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            padding: 40px;
+        }
+        .logo {
+            font-size: 120px;
+            margin-bottom: 30px;
+            animation: float 3s ease-in-out infinite;
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+        p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        .status {
+            background: rgba(255,255,255,0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .buttons {
+            margin-top: 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .button {
+            display: block;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            transition: all 0.3s;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        .button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        .primary {
+            background: rgba(255,107,107,0.3);
+            border-color: #ff6b6b;
+        }
+        .primary:hover {
+            background: rgba(255,107,107,0.5);
+        }
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-20px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍹</div>
+        <h1>Cocktail Machine</h1>
+        <p>Your cocktail machine is successfully installed and running!</p>
+        
+        <div class="status">
+            <h3>🎯 System Status: Online</h3>
+            <p>Installation completed successfully</p>
+        </div>
+        
+        <div class="buttons">
+            <a href="http://localhost:1880/ui" class="button primary">🔴 Node-RED Dashboard</a>
+            <a href="http://localhost:1880/admin" class="button">⚙️ Node-RED Editor</a>
+            <a href="/health" class="button">❤️ Health Check</a>
+            <a href="/system-info.html" class="button">📊 System Info</a>
+        </div>
+        
+        <p style="margin-top: 40px; font-size: 14px; opacity: 0.7;">
+            Access this system from any device on your network
+        </p>
+    </div>
     
-    # Try alternative method - download individual files from deploy repo
-    if curl -L -f "https://api.github.com/repos/$DEPLOY_REPO/contents" > /tmp/repo_contents.json 2>/dev/null; then
-        print_error "Dashboard package not found. Please ensure web.tar.gz exists in the deploy repository."
-    else
-        print_error "Cannot access deploy repository. Check network connectivity."
-    fi
-    exit 1
-fi
+    <script>
+        // Check Node-RED status
+        fetch('/health')
+            .then(response => response.text())
+            .then(data => {
+                if (data.includes('healthy')) {
+                    console.log('✅ System healthy');
+                }
+            })
+            .catch(err => console.log('ℹ️ Health check unavailable'));
+    </script>
+</body>
+</html>
+DASHBOARD_EOF
 
-# Validate download
-if [ ! -f /tmp/dashboard.tar.gz ] || [ ! -s /tmp/dashboard.tar.gz ]; then
-    print_error "Downloaded file is empty or missing"
-    exit 1
-fi
+print_status "Dashboard created"
 
-# Extract dashboard files
-print_info "Extracting dashboard to $WEBROOT_DIR..."
-cd /tmp
-
-# Extract with verbose output to debug
-print_info "Extracting archive contents..."
-if tar -tzf dashboard.tar.gz > /tmp/tar_contents.txt 2>/dev/null; then
-    print_info "Archive contents:"
-    head -10 /tmp/tar_contents.txt | while read line; do print_info "  $line"; done
-else
-    print_error "Invalid or corrupted tar.gz file"
-    file /tmp/dashboard.tar.gz
-    exit 1
-fi
-
-# Extract the archive
-if tar -xzf dashboard.tar.gz; then
-    print_status "Archive extracted successfully"
-else
-    print_error "Failed to extract archive"
-    exit 1
-fi
+# Dashboard files are ready
+print_info "Dashboard files ready for installation"
 
 # Find and copy dashboard files
 print_info "Locating dashboard files..."
@@ -467,16 +534,10 @@ print_status "Nginx configuration completed"
 # Step 7: Set up Docker containers for Node-RED and MQTT
 print_step "Step 7: Setting up backend services..."
 
-# Create project directory based on mode
-if [ "$DEV_MODE" = "true" ]; then
-    PROJECT_DIR="/home/$USER/cocktail-machine-dev"
-    NGINX_SITE_NAME="cocktail-machine-dev"
-    KIOSK_DIR="/home/$USER/.cocktail-machine-dev"
-else
-    PROJECT_DIR="/home/$USER/cocktail-machine-prod"
-    NGINX_SITE_NAME="cocktail-machine-prod"
-    KIOSK_DIR="/home/$USER/.cocktail-machine-prod"
-fi
+# Create project directory (same structure regardless of source repo)
+PROJECT_DIR="/home/$USER/cocktail-machine"
+NGINX_SITE_NAME="cocktail-machine"
+KIOSK_DIR="/home/$USER/.cocktail-machine"
 mkdir -p "$PROJECT_DIR"
 
 # Create simple docker-compose for backend services only
