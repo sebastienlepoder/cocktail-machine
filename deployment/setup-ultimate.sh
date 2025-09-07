@@ -815,7 +815,7 @@ print_status "Kiosk system configured"
 # Step 10: Configure kiosk auto-start (same as before)
 print_step "Step 10: Configuring kiosk auto-start..."
 
-# Configure auto-login
+# Configure auto-login with proper session setup
 sudo mkdir -p /etc/lightdm/lightdm.conf.d
 sudo tee /etc/lightdm/lightdm.conf.d/01-autologin.conf > /dev/null << EOF
 [Seat:*]
@@ -823,7 +823,79 @@ autologin-user=$USER
 autologin-user-timeout=0
 user-session=openbox
 greeter-session=lightdm-gtk-greeter
+autologin-session=openbox
+allow-guest=false
 EOF
+
+# Create openbox autostart directory and script
+sudo mkdir -p /home/$USER/.config/openbox
+sudo tee /home/$USER/.config/openbox/autostart > /dev/null << 'AUTOSTART_EOF'
+#!/bin/bash
+# Openbox autostart script for cocktail machine kiosk
+
+# Set X11 environment
+export DISPLAY=:0
+
+# Copy X11 authorization for user access
+if [ -f "/var/run/lightdm/root/:0" ]; then
+    sudo cp "/var/run/lightdm/root/:0" "/home/$USER/.Xauthority"
+    sudo chown $USER:$USER "/home/$USER/.Xauthority"
+    chmod 600 "/home/$USER/.Xauthority"
+fi
+
+# Start unclutter to hide mouse cursor
+unclutter -idle 1 -root &
+
+# Wait a moment for desktop to initialize
+sleep 2
+
+# Start the cocktail machine kiosk
+/home/$USER/.cocktail-machine/kiosk-launcher.sh &
+AUTOSTART_EOF
+
+sudo chown -R $USER:$USER /home/$USER/.config
+sudo chmod +x /home/$USER/.config/openbox/autostart
+
+# Create a script to fix X11 permissions after lightdm starts
+sudo tee /usr/local/bin/fix-x11-permissions.sh > /dev/null << 'PERM_SCRIPT_EOF'
+#!/bin/bash
+# Fix X11 permissions for pi user
+
+# Wait for lightdm to create auth file
+for i in {1..30}; do
+    if [ -f "/var/run/lightdm/root/:0" ]; then
+        break
+    fi
+    sleep 1
+done
+
+# Copy auth file to user directory
+if [ -f "/var/run/lightdm/root/:0" ]; then
+    cp "/var/run/lightdm/root/:0" "/home/pi/.Xauthority"
+    chown pi:pi "/home/pi/.Xauthority"
+    chmod 600 "/home/pi/.Xauthority"
+fi
+PERM_SCRIPT_EOF
+
+sudo chmod +x /usr/local/bin/fix-x11-permissions.sh
+
+# Create systemd service to fix permissions after lightdm
+sudo tee /etc/systemd/system/fix-x11-permissions.service > /dev/null << EOF
+[Unit]
+Description=Fix X11 permissions for pi user
+After=lightdm.service
+Requires=lightdm.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/fix-x11-permissions.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target
+EOF
+
+sudo systemctl enable fix-x11-permissions.service
 
 # Enable graphical target
 sudo systemctl set-default graphical.target
@@ -838,35 +910,27 @@ else
     print_info "Display manager may need manual configuration after reboot"
 fi
 
-# Create systemd service for kiosk with improved X11 support
-sudo tee /etc/systemd/system/cocktail-kiosk-startup.service > /dev/null << EOF
+# Note: Kiosk startup is now handled by openbox autostart
+# Create a simple monitoring service instead
+sudo tee /etc/systemd/system/cocktail-kiosk-monitor.service > /dev/null << EOF
 [Unit]
-Description=Start Cocktail Machine Kiosk
-After=lightdm.service graphical.target multi-user.target display-manager.service
-Wants=lightdm.service display-manager.service
-Requires=graphical.target
+Description=Monitor Cocktail Machine Kiosk
+After=graphical.target lightdm.service
+Wants=lightdm.service
 
 [Service]
-Type=forking
+Type=simple
 User=root
-Environment=DISPLAY=:0
-Environment=HOME=/root
-ExecStartPre=/bin/sleep 20
-ExecStartPre=/bin/bash -c 'while ! systemctl is-active lightdm >/dev/null 2>&1; do sleep 2; done'
-ExecStartPre=/bin/bash -c 'while ! pgrep Xorg >/dev/null 2>&1; do sleep 2; done'
-ExecStartPre=/bin/bash -c 'for i in {1..30}; do if [ -f "/var/run/lightdm/root/:0" ] || [ -f "/home/$USER/.Xauthority" ]; then break; fi; sleep 1; done'
-ExecStart=/bin/bash -c 'sudo -u $USER DISPLAY=:0 /home/$USER/.cocktail-machine/kiosk-launcher.sh &'
-RemainAfterExit=yes
-Restart=on-failure
-RestartSec=15
-TimeoutStartSec=120
+Restart=always
+RestartSec=30
+ExecStart=/bin/bash -c 'while true; do if ! pgrep -f "chromium.*http://localhost" >/dev/null && systemctl is-active lightdm >/dev/null; then logger "Cocktail kiosk not running, desktop should restart it"; fi; sleep 30; done'
 
 [Install]
 WantedBy=graphical.target
 EOF
 
 sudo systemctl daemon-reload
-sudo systemctl enable cocktail-kiosk-startup.service
+sudo systemctl enable cocktail-kiosk-monitor.service
 
 print_status "Kiosk auto-start configured"
 
