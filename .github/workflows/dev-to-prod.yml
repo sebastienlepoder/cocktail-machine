@@ -25,8 +25,8 @@ on:
         type: boolean
 
 env:
-  PROD_REPO: sebastienlepoder/cocktail-deploy
-  DEV_REPO: sebastienlepoder/cocktail-machine
+  PROD_REPO: sebastienlepoder/cocktail-machine-prod
+  DEV_REPO: sebastienlepoder/cocktail-machine-dev
 
 jobs:
   dev-to-prod-deployment:

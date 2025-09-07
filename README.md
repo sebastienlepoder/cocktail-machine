@@ -2,6 +2,10 @@
 
 A professional-grade automated cocktail machine with modular bottle controllers, centralized management, and remote update capabilities.
 
+> **📂 Repository Structure:**  
+> **Development:** [cocktail-machine-dev](https://github.com/sebastienlepoder/cocktail-machine-dev) (this repo - source code & development)  
+> **Production:** [cocktail-machine-prod](https://github.com/sebastienlepoder/cocktail-machine-prod) (deployment packages for Raspberry Pi users)
+
 ## 🎯 Overview
 
 This project implements a complete cocktail dispensing system using ESP32 microcontrollers for individual bottle control and a Raspberry Pi 5 as the main controller. The system features automatic recipe execution, real-time inventory tracking, and a modern web interface.
@@ -49,7 +53,7 @@ cocktail-machine/
 
 ```bash
 # One-line installation
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine-prod/main/scripts/setup-ultimate.sh | bash
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
@@ -163,8 +167,8 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 ## 📞 Support
 
 - **Documentation**: See [DEPLOYMENT.md](DEPLOYMENT.md)
-- **Issues**: [GitHub Issues](https://github.com/sebastienlepoder/cocktail-machine/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/sebastienlepoder/cocktail-machine/discussions)
+- **Issues**: [GitHub Issues](https://github.com/sebastienlepoder/cocktail-machine-dev/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/sebastienlepoder/cocktail-machine-dev/discussions)
 
 ## 👥 Author
 
