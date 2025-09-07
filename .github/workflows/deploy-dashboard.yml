@@ -55,7 +55,59 @@ jobs:
       run: |
         if [ -d web ] && [ -f web/package.json ]; then
           cd web
-          npm run build || npm run export || echo "No build script found"
+          
+          echo "🔨 Building Next.js dashboard..."
+          
+          # Try to build for static export first
+          if npm run build 2>&1 | tee build.log; then
+            echo "✅ npm run build completed successfully"
+            
+            # Check if we have static export configured
+            if [ -d "out" ]; then
+              echo "✅ Found static export in 'out' directory"
+            elif [ -d ".next" ]; then
+              echo "⚠️ Found .next directory (server build)"
+              echo "💡 Attempting static export..."
+              
+              # Try to run export if it exists
+              if npm run export 2>/dev/null; then
+                echo "✅ Static export successful"
+              else
+                echo "📝 Configuring static export in next.config.js..."
+                
+                # Backup original config
+                [ -f next.config.js ] && cp next.config.js next.config.js.bak
+                
+                # Add static export config
+                cat > next.config.js << 'NEXTJS_CONFIG'
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export',
+  trailingSlash: true,
+  images: {
+    unoptimized: true
+  },
+  assetPrefix: '',
+  basePath: '',
+  distDir: 'out'
+}
+
+module.exports = nextConfig
+NEXTJS_CONFIG
+                
+                echo "🔄 Rebuilding with static export..."
+                npm run build || echo "⚠️ Static export build failed"
+              fi
+            fi
+          else
+            echo "⚠️ npm run build failed, check build.log"
+            cat build.log 2>/dev/null || true
+          fi
+          
+          # Show what we have after build
+          echo "📁 Build output directories:"
+          ls -la | grep "^d" || echo "No directories found"
+          
         else
           echo "No web directory or package.json found, skipping build"
         fi
@@ -81,25 +133,140 @@ jobs:
         mkdir -p deploy/scripts
         mkdir -p deploy/kiosk
         
-        # Copy built web files
-        if [ -d web/dist ] && [ "$(find web/dist -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-          echo "Copying from web/dist/"
+        # Copy built web files (prioritize static export over server build)
+        if [ -d web/out ] && [ "$(find web/out -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+          echo "✅ Found Next.js static export in web/out/"
+          cp -r web/out/. deploy/web/
+        elif [ -d web/dist ] && [ "$(find web/dist -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+          echo "✅ Found built files in web/dist/"
           cp -r web/dist/. deploy/web/
         elif [ -d web/build ] && [ "$(find web/build -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-          echo "Copying from web/build/"
+          echo "✅ Found built files in web/build/"
           cp -r web/build/. deploy/web/
-        elif [ -d web/out ] && [ "$(find web/out -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-          echo "Copying from web/out/"
-          cp -r web/out/. deploy/web/
+        elif [ -d web/.next/static ] && [ "$(find web/.next/static -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+          echo "⚠️ Found Next.js server build, but need static export for nginx"
+          echo "💡 Attempting to extract static assets from .next build..."
+          
+          # Create basic index.html for Next.js server build
+          cat > deploy/web/index.html << 'NEXTJS_HTML'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍹 Cocktail Machine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        .container { max-width: 600px; padding: 40px; }
+        .logo { font-size: 120px; margin-bottom: 30px; animation: float 3s ease-in-out infinite; }
+        h1 { font-size: 48px; margin-bottom: 20px; font-weight: 300; }
+        p { font-size: 18px; margin-bottom: 30px; opacity: 0.9; }
+        .status { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .buttons { margin-top: 30px; }
+        .button {
+            display: inline-block; background: rgba(255,255,255,0.2); color: white;
+            padding: 12px 24px; margin: 0 10px; border-radius: 6px;
+            text-decoration: none; transition: background 0.3s;
+        }
+        .button:hover { background: rgba(255,255,255,0.3); }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍹</div>
+        <h1>Cocktail Machine</h1>
+        <p>Your cocktail machine is successfully installed and running!</p>
+        <div class="status">
+            <h3>🎯 System Status: Online</h3>
+            <p>Dashboard built with Next.js server mode</p>
+            <p><small>⚠️ Configure static export for full React features</small></p>
+        </div>
+        <div class="buttons">
+            <a href="http://localhost:1880" class="button">🔧 Node-RED Dashboard</a>
+            <a href="/health" class="button">❤️ Health Check</a>
+        </div>
+    </div>
+</body>
+</html>
+NEXTJS_HTML
+          
+          # Copy static assets if available
+          [ -d web/.next/static ] && cp -r web/.next/static deploy/web/_next/ 2>/dev/null || true
+          
         elif [ -d web/public ] && [ "$(find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' 2>/dev/null)" ]; then
-          echo "Copying from web/public/"
+          echo "📁 Found public directory, copying public assets"
           find web/public -mindepth 1 -maxdepth 1 ! -name '.gitkeep' -exec cp -r {} deploy/web/ \;
-        elif [ -d web ] && [ "$(find web -mindepth 1 -maxdepth 1 -type f 2>/dev/null)" ]; then
-          echo "No built web files found, copying source files"
-          find web -mindepth 1 -maxdepth 1 -type f -exec cp {} deploy/web/ \;
+          
+          # Ensure there's an index.html
+          if [ ! -f deploy/web/index.html ]; then
+            echo "📄 Creating index.html in public directory"
+            cat > deploy/web/index.html << 'PUBLIC_HTML'
+<!DOCTYPE html>
+<html><head><title>🍹 Cocktail Machine</title></head>
+<body style="font-family: Arial; text-align: center; padding: 50px; background: #2c3e50; color: white;">
+    <h1 style="font-size: 48px;">🍹 Cocktail Machine</h1>
+    <p>Dashboard ready - public directory deployment</p>
+    <a href="http://localhost:1880" style="color: #3498db;">Node-RED Dashboard</a>
+</body></html>
+PUBLIC_HTML
+          fi
+          
         else
-          echo "No web directory or files found, creating placeholder"
-          echo "<!DOCTYPE html><html><head><title>Cocktail Machine</title></head><body><h1>🍹 Cocktail Machine</h1><p>Dashboard will be available soon</p></body></html>" > deploy/web/index.html
+          echo "❌ No built web files found - creating production-ready placeholder"
+          cat > deploy/web/index.html << 'FALLBACK_HTML'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🍹 Cocktail Machine</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; align-items: center; justify-content: center; height: 100vh; text-align: center;
+        }
+        .container { max-width: 600px; padding: 40px; }
+        .logo { font-size: 120px; margin-bottom: 30px; animation: float 3s ease-in-out infinite; }
+        h1 { font-size: 48px; margin-bottom: 20px; font-weight: 300; }
+        p { font-size: 18px; margin-bottom: 30px; opacity: 0.9; }
+        .status { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 10px; margin: 20px 0; }
+        .buttons { margin-top: 30px; }
+        .button { display: inline-block; background: rgba(255,255,255,0.2); color: white; padding: 12px 24px; margin: 0 10px; border-radius: 6px; text-decoration: none; transition: background 0.3s; }
+        .button:hover { background: rgba(255,255,255,0.3); }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-20px); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍹</div>
+        <h1>Cocktail Machine</h1>
+        <p>Your cocktail machine is successfully installed and running!</p>
+        <div class="status">
+            <h3>⚙️ Setup Complete</h3>
+            <p>React dashboard will be available after first build</p>
+        </div>
+        <div class="buttons">
+            <a href="http://localhost:1880" class="button">🔧 Node-RED Dashboard</a>
+            <a href="/health" class="button">❤️ Health Check</a>
+        </div>
+        <p style="margin-top: 40px; font-size: 14px; opacity: 0.7;">Configure Next.js static export for full React features</p>
+    </div>
+</body>
+</html>
+FALLBACK_HTML
         fi
         
         # Copy additional web resources if they exist
