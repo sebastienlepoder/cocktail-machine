@@ -137,36 +137,101 @@ fi
 # Step 4: Download Production React Dashboard
 print_step "Step 4: Downloading production React dashboard..."
 
-# Create directories
+# Create directories with proper permissions
 sudo mkdir -p "$WEBROOT_DIR" "$SCRIPTS_DIR"
+sudo chown -R www-data:www-data "$WEBROOT_DIR"
+sudo chmod -R 755 "$WEBROOT_DIR"
 
 # Download the production dashboard package
 print_info "Downloading latest dashboard from production repository..."
 DASHBOARD_URL="https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/web.tar.gz"
-curl -L -o /tmp/dashboard.tar.gz "$DASHBOARD_URL"
 
-if [ $? -eq 0 ] && [ -f /tmp/dashboard.tar.gz ] && [ -s /tmp/dashboard.tar.gz ]; then
+# Clean up any previous downloads
+rm -rf /tmp/dashboard.tar.gz /tmp/web 2>/dev/null || true
+
+# Download with better error handling
+print_info "Fetching dashboard package..."
+if curl -L -f -o /tmp/dashboard.tar.gz "$DASHBOARD_URL"; then
     print_status "Dashboard package downloaded successfully"
-    
-    # Extract to webroot
-    print_info "Extracting dashboard to $WEBROOT_DIR..."
-    cd /tmp
-    tar -xzf dashboard.tar.gz
-    if [ -d "web" ]; then
-        sudo cp -r web/* "$WEBROOT_DIR/"
-        sudo chown -R www-data:www-data "$WEBROOT_DIR"
-        sudo chmod -R 755 "$WEBROOT_DIR"
-        print_status "Dashboard extracted and permissions set"
-    else
-        print_error "Invalid dashboard package format"
-        exit 1
-    fi
-    
-    rm -rf /tmp/web /tmp/dashboard.tar.gz
 else
-    print_error "Failed to download dashboard package"
+    print_error "Failed to download dashboard package from $DASHBOARD_URL"
+    print_info "Attempting alternative download method..."
+    
+    # Try alternative method - download individual files from deploy repo
+    if curl -L -f "https://api.github.com/repos/$DEPLOY_REPO/contents" > /tmp/repo_contents.json 2>/dev/null; then
+        print_error "Dashboard package not found. Please ensure web.tar.gz exists in the deploy repository."
+    else
+        print_error "Cannot access deploy repository. Check network connectivity."
+    fi
     exit 1
 fi
+
+# Validate download
+if [ ! -f /tmp/dashboard.tar.gz ] || [ ! -s /tmp/dashboard.tar.gz ]; then
+    print_error "Downloaded file is empty or missing"
+    exit 1
+fi
+
+# Extract dashboard files
+print_info "Extracting dashboard to $WEBROOT_DIR..."
+cd /tmp
+
+# Extract with verbose output to debug
+print_info "Extracting archive contents..."
+if tar -tzf dashboard.tar.gz > /tmp/tar_contents.txt 2>/dev/null; then
+    print_info "Archive contents:"
+    head -10 /tmp/tar_contents.txt | while read line; do print_info "  $line"; done
+else
+    print_error "Invalid or corrupted tar.gz file"
+    file /tmp/dashboard.tar.gz
+    exit 1
+fi
+
+# Extract the archive
+if tar -xzf dashboard.tar.gz; then
+    print_status "Archive extracted successfully"
+else
+    print_error "Failed to extract archive"
+    exit 1
+fi
+
+# Find and copy dashboard files
+print_info "Locating dashboard files..."
+if [ -d "web" ]; then
+    print_info "Found web directory, copying files..."
+    sudo cp -rv web/* "$WEBROOT_DIR/"
+elif [ -f "index.html" ]; then
+    print_info "Found dashboard files in root, copying..."
+    sudo cp -rv * "$WEBROOT_DIR/"
+else
+    print_error "No valid dashboard files found in archive"
+    print_info "Archive structure:"
+    ls -la
+    exit 1
+fi
+
+# Set proper permissions
+print_info "Setting file permissions..."
+sudo chown -R www-data:www-data "$WEBROOT_DIR"
+sudo chmod -R 755 "$WEBROOT_DIR"
+sudo find "$WEBROOT_DIR" -type f -exec chmod 644 {} \;
+
+# Verify files were copied correctly
+print_info "Verifying dashboard installation..."
+if [ -f "$WEBROOT_DIR/index.html" ]; then
+    print_status "Dashboard files installed successfully"
+    print_info "Dashboard files:"
+    ls -la "$WEBROOT_DIR/" | head -5
+else
+    print_error "Dashboard installation verification failed - index.html not found"
+    print_info "Contents of $WEBROOT_DIR:"
+    ls -la "$WEBROOT_DIR/"
+    exit 1
+fi
+
+# Clean up
+rm -rf /tmp/web /tmp/dashboard.tar.gz /tmp/tar_contents.txt /tmp/repo_contents.json 2>/dev/null || true
+print_status "Dashboard installation completed"
 
 # Step 5: Download production scripts
 print_step "Step 5: Installing production scripts..."
@@ -601,12 +666,27 @@ fi
 # Test React dashboard with retry
 print_info "Testing React dashboard on port 80..."
 for i in {1..5}; do
-    if curl -s http://localhost | grep -q "html\|HTML\|<\|>"; then
+    RESPONSE=$(curl -s http://localhost 2>/dev/null || echo "connection_failed")
+    if echo "$RESPONSE" | grep -q "403 Forbidden"; then
+        print_error "Dashboard returning 403 Forbidden - permissions issue detected"
+        print_info "Checking file permissions..."
+        ls -la "$WEBROOT_DIR/" | head -3
+        print_info "Fixing permissions..."
+        sudo chown -R www-data:www-data "$WEBROOT_DIR"
+        sudo chmod -R 644 "$WEBROOT_DIR"/*
+        sudo chmod 755 "$WEBROOT_DIR"
+        sudo systemctl reload nginx
+        sleep 2
+    elif echo "$RESPONSE" | grep -q "html\|HTML\|<title\|<!DOCTYPE"; then
         print_status "React dashboard is accessible on port 80"
         break
     elif [ $i -eq 5 ]; then
-        print_info "React dashboard not yet accessible (may need more time)"
+        print_error "Dashboard not accessible after 5 attempts"
+        print_info "Response received: $(echo "$RESPONSE" | head -1)"
+        print_info "Checking nginx error log:"
+        sudo tail -3 /var/log/nginx/error.log 2>/dev/null || print_info "No nginx error log available"
     else
+        print_info "Attempt $i/5: Waiting for dashboard..."
         sleep 2
     fi
 done
@@ -638,6 +718,9 @@ echo "📊 System Status:"
 echo "   • Nginx process: $(pgrep nginx >/dev/null && echo 'Running' || echo 'Not running')"
 echo "   • Docker process: $(pgrep dockerd >/dev/null && echo 'Running' || echo 'Not running')"
 echo "   • Dashboard files: $([ -f /opt/webroot/index.html ] && echo 'Present' || echo 'Missing')"
+echo "   • Webroot permissions: $(ls -ld /opt/webroot 2>/dev/null | awk '{print $1, $3, $4}' || echo 'Not accessible')"
+echo "   • Index.html size: $([ -f /opt/webroot/index.html ] && stat -c%s /opt/webroot/index.html || echo 'N/A') bytes"
+echo "   • Nginx config test: $(sudo nginx -t 2>&1 >/dev/null && echo 'Valid' || echo 'Invalid')"
 echo "   • Kiosk scripts: $([ -f /home/$USER/.cocktail-machine/kiosk-launcher.sh ] && echo 'Present' || echo 'Missing')"
 
 # Try to fix common issues
