@@ -72,5 +72,5 @@ https://github.com/sebastienlepoder/cocktail-machine
 
 The automated deployment script will work immediately:
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-machine/main/deployment/setup-raspberry-pi.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
 ```

@@ -52,7 +52,7 @@ git clone https://github.com/sebastienlepoder/cocktail-machine.git
 cd cocktail-machine/deployment
 
 # Run automated setup
-./setup-raspberry-pi.sh
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
 
 # Start all services
 docker-compose up -d

@@ -453,21 +453,21 @@ The Cocktail Machine consists of:
 
 ### 2. Run Automated Setup
 
-Connect to your Raspberry Pi via SSH or directly, then run the **Ultimate Setup Script**:
+Connect to your Raspberry Pi via SSH or directly, then run the **Production Setup Script**:
 
 ```bash
-# Download and run the ultimate kiosk setup script
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh -o setup-ultimate.sh
-chmod +x setup-ultimate.sh
-./setup-ultimate.sh
+# Download and run the production setup script (one-line install)
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
 ```
 
-> ⚠️ **Important**: Use `setup-ultimate.sh` instead of the basic setup script. This provides:
-> - Proper kiosk mode with loading screen
-> - Robust service health checking  
-> - Auto-login to desktop
-> - Quiet boot configuration
-> - Professional presentation mode
+**This setup script provides:**
+- ✅ **Your React dashboard** downloaded directly from production
+- ✅ **Proper Docker configuration** with nginx serving your dashboard
+- ✅ **Kiosk mode** with loading screen and auto-start
+- ✅ **Update system** with production scripts
+- ✅ **Health checking** and service monitoring
+- ✅ **Auto-login** and quiet boot configuration
+- ✅ **Professional presentation** mode
 
 This script will:
 - Install Docker and Docker Compose

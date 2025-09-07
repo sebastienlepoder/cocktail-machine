@@ -32,7 +32,7 @@ cocktail-machine/
 ├── web/                # Web dashboard (React + Supabase)
 ├── deployment/         # Docker configs and setup scripts
 │   ├── docker-compose.yml
-│   ├── setup-raspberry-pi.sh
+│   ├── setup-ultimate.sh
 │   ├── mosquitto/      # MQTT broker configuration
 │   ├── updater/        # Auto-update service
 │   └── nginx/          # Reverse proxy config
@@ -49,7 +49,7 @@ cocktail-machine/
 
 ```bash
 # One-line installation
-curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-raspberry-pi.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sebastienlepoder/cocktail-deploy/main/scripts/setup-ultimate.sh | bash
 ```
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
