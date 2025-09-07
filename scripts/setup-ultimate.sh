@@ -1010,9 +1010,9 @@ KIOSK_EOF
 chmod +x "$KIOSK_DIR/start-kiosk.sh"
 
 # Create auto-start script that runs after auto-login
-cat > /home/$USER/.bash_profile << 'PROFILE_EOF'
+cat > /home/$USER/.bash_profile << PROFILE_EOF
 # Auto-start kiosk when logging into tty1
-if [ "$(tty)" = "/dev/tty1" ] && [ -z "$DISPLAY" ]; then
+if [ "\$(tty)" = "/dev/tty1" ] && [ -z "\$DISPLAY" ]; then
     echo "Starting cocktail machine kiosk..."
     $KIOSK_DIR/start-kiosk.sh
 fi
