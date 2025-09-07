@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# Cocktail Machine - Simplified Production Setup
+# Cocktail Machine - Production Setup Script
+# Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
+
+SCRIPT_VERSION="2025.09.07-v1.0.0"
+SCRIPT_BUILD="Build-001"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
+echo "📦 Script Version: $SCRIPT_VERSION ($SCRIPT_BUILD)"
 echo "=================================================="
 
 # Colors
@@ -1096,4 +1101,7 @@ echo "🎯 After reboot, your Pi will display the React dashboard"
 echo "   in full-screen kiosk mode automatically!"
 echo ""
 echo "⏰ Ready to reboot? Run: sudo reboot"
+echo ""
+echo "📦 Installation completed with script version: $SCRIPT_VERSION ($SCRIPT_BUILD)"
+echo "🕰️ Installation timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=================================================="
