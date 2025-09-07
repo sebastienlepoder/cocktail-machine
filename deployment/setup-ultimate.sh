@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.2"
-SCRIPT_BUILD="Build-003"
+SCRIPT_VERSION="2025.09.07-v1.0.3"
+SCRIPT_BUILD="Build-004"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -554,6 +554,20 @@ sudo apt-get install -y \
 
 print_info "Skipping display manager - using direct X11 startup"
 
+# Add pi user to required groups for X11 access
+print_info "Adding pi user to required groups..."
+sudo usermod -a -G tty,video,input,render $USER
+
+# Configure auto-login on console
+print_info "Setting up auto-login..."
+sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
+sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf > /dev/null << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --noissue --autologin $USER %I \$TERM
+Type=idle
+EOF
+
 # Create a simple system info page instead of kiosk
 sudo tee /opt/webroot/system-info.html > /dev/null << 'SYSTEM_INFO_EOF'
 <!DOCTYPE html>
@@ -630,30 +644,56 @@ print_step "Step 9: Creating simple kiosk startup..."
 # Create kiosk directory
 mkdir -p /home/$USER/.cocktail-machine
 
-# Create simple kiosk script
+# Create improved kiosk script
 cat > /home/$USER/.cocktail-machine/start-kiosk.sh << 'KIOSK_EOF'
 #!/bin/bash
-# Simple kiosk startup script
+# Improved kiosk startup script with better error handling
+
+echo "[$(date)] Starting kiosk setup..."
 
 # Wait for network and nginx to be ready
-echo "Waiting for network and services..."
-sleep 10
+echo "[$(date)] Waiting for network and services..."
+sleep 15
 
 # Wait for nginx to respond
+echo "[$(date)] Checking if dashboard is ready..."
 for i in {1..30}; do
     if curl -s http://localhost >/dev/null 2>&1; then
-        echo "Dashboard is ready!"
+        echo "[$(date)] Dashboard is ready!"
         break
     fi
     sleep 2
 done
 
-# Start X11 and browser directly
+# Check if we're on the right console
+if [ "$(tty)" != "/dev/tty1" ]; then
+    echo "[$(date)] Not on tty1, exiting"
+    exit 0
+fi
+
+# Set up environment
+echo "[$(date)] Setting up X11 environment..."
 export DISPLAY=:0
-startx /usr/bin/openbox-session &
-sleep 5
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+mkdir -p $XDG_RUNTIME_DIR
+
+# Start X11 server with openbox window manager
+echo "[$(date)] Starting X11 server..."
+startx /usr/bin/openbox-session -- :0 -nolisten tcp vt1 &
+X11_PID=$!
+
+# Wait for X11 to start
+echo "[$(date)] Waiting for X11 server to be ready..."
+for i in {1..30}; do
+    if xset -display :0 q >/dev/null 2>&1; then
+        echo "[$(date)] X11 server is ready!"
+        break
+    fi
+    sleep 1
+done
 
 # Start chromium in kiosk mode
+echo "[$(date)] Starting chromium browser..."
 DISPLAY=:0 chromium-browser \
     --kiosk \
     --noerrdialogs \
@@ -663,35 +703,48 @@ DISPLAY=:0 chromium-browser \
     --no-first-run \
     --disable-dev-shm-usage \
     --disable-software-rasterizer \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --start-fullscreen \
     http://localhost \
-    >/dev/null 2>&1 &
+    >/tmp/chromium.log 2>&1 &
 
-echo "Kiosk browser started"
+CHROMIUM_PID=$!
+echo "[$(date)] Chromium started with PID: $CHROMIUM_PID"
+
+# Monitor the processes
+while true; do
+    if ! ps -p $CHROMIUM_PID > /dev/null; then
+        echo "[$(date)] Chromium crashed, restarting..."
+        DISPLAY=:0 chromium-browser \
+            --kiosk \
+            --noerrdialogs \
+            --disable-infobars \
+            --disable-extensions \
+            --disable-plugins \
+            --no-first-run \
+            --disable-dev-shm-usage \
+            --disable-software-rasterizer \
+            http://localhost >/tmp/chromium.log 2>&1 &
+        CHROMIUM_PID=$!
+    fi
+    sleep 30
+done
 KIOSK_EOF
 
 chmod +x /home/$USER/.cocktail-machine/start-kiosk.sh
 
-# Create systemd service for kiosk
-sudo tee /etc/systemd/system/cocktail-kiosk.service > /dev/null << EOF
-[Unit]
-Description=Cocktail Machine Kiosk Display
-After=network-online.target nginx.service
-Wants=network-online.target
-Requires=nginx.service
+# Create auto-start script that runs after auto-login
+cat > /home/$USER/.bash_profile << 'PROFILE_EOF'
+# Auto-start kiosk when logging into tty1
+if [ "$(tty)" = "/dev/tty1" ] && [ -z "$DISPLAY" ]; then
+    echo "Starting cocktail machine kiosk..."
+    /home/$USER/.cocktail-machine/start-kiosk.sh
+fi
+PROFILE_EOF
 
-[Service]
-Type=simple
-User=$USER
-Environment=HOME=/home/$USER
-ExecStart=/home/$USER/.cocktail-machine/start-kiosk.sh
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl enable cocktail-kiosk.service
+# Note: Kiosk will now start automatically via .bash_profile after auto-login
+# No systemd service needed - simpler and more reliable
 
 print_status "Simple kiosk startup configured"
 
