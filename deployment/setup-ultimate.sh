@@ -27,6 +27,8 @@ SCRIPTS_DIR="/opt/scripts"
 
 # Set non-interactive mode
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+export NEEDRESTART_SUSPEND=1
 
 print_step "Checking Raspberry Pi OS version..."
 if [ -f /etc/os-release ]; then
@@ -44,6 +46,20 @@ fi
 # Step 1: System Update and Clock Sync
 print_step "Step 1: Updating system and syncing clock..."
 
+# Configure system to avoid interactive prompts
+print_info "Configuring non-interactive mode..."
+
+# Prevent needrestart from showing interactive dialogs
+sudo mkdir -p /etc/needrestart
+echo '$nrconf{restart} = "a";' | sudo tee /etc/needrestart/needrestart.conf > /dev/null
+echo '$nrconf{kernelhints} = 0;' | sudo tee -a /etc/needrestart/needrestart.conf > /dev/null
+
+# Configure APT to avoid interactive prompts
+sudo mkdir -p /etc/apt/apt.conf.d
+echo 'DPkg::Post-Invoke-Success {"test -x /usr/bin/needrestart && /usr/bin/needrestart -n || true"; };' | sudo tee /etc/apt/apt.conf.d/99needrestart > /dev/null
+echo 'APT::Get::Assume-Yes "true";' | sudo tee /etc/apt/apt.conf.d/99noninteractive > /dev/null
+echo 'Dpkg::Options { "--force-confdef"; "--force-confold"; }' | sudo tee -a /etc/apt/apt.conf.d/99noninteractive > /dev/null
+
 # Sync system clock to fix timestamp warnings
 print_info "Synchronizing system clock..."
 sudo apt-get update -y
@@ -54,7 +70,15 @@ sudo systemctl start ntp 2>/dev/null || true
 sudo systemctl enable ntp 2>/dev/null || true
 
 print_info "Upgrading packages..."
-sudo apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
+# Configure debconf to avoid kernel restart dialogs
+echo 'libc6 libraries/restart-without-asking boolean true' | sudo debconf-set-selections
+echo 'libssl1.1:amd64 libssl1.1/restart-services string' | sudo debconf-set-selections 2>/dev/null || true
+
+# Upgrade with all non-interactive options
+sudo apt-get upgrade -y \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" \
+    -o DPkg::Post-Invoke-Success::="test -x /usr/bin/needrestart && /usr/bin/needrestart -n || true"
 print_status "System updated and clock synchronized"
 
 # Step 2: Install essential packages + nginx
