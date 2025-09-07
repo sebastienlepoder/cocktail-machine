@@ -1,0 +1,11 @@
+{
+  "latest_version": "v2025.09.07.patch-97aceca",
+  "package_file": "dashboard-v2025.09.07.patch-97aceca.tar.gz",
+  "package_size": "362K",
+  "deployment_date": "2025-09-07T01:28:27Z",
+  "source_repo": "cocktail-slider-display",
+  "source_commit": "97aceca",
+  "release_type": "patch",
+  "release_notes": "Testing web dashboard deployment workflow",
+  "deployed_by": "GitHub Actions Web Deploy"
+}
