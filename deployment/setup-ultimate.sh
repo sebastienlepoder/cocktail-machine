@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.6"
-SCRIPT_BUILD="Build-773"
+SCRIPT_VERSION="2025.09.07-v1.0.7"
+SCRIPT_BUILD="Build-487"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -23,6 +23,7 @@ print_status() { echo -e "${GREEN}✓${NC} $1"; }
 print_error() { echo -e "${RED}✗${NC} $1"; }
 print_info() { echo -e "${YELLOW}ℹ${NC} $1"; }
 print_step() { echo -e "${BLUE}►${NC} $1"; }
+print_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
 
 # Configuration - Auto-detect repository based on script source
 if [[ "$(curl -s "$0" 2>/dev/null || echo '')" == *"cocktail-machine-dev"* ]] || [[ "$0" == *"cocktail-machine-dev"* ]]; then
@@ -563,9 +564,12 @@ server {
 }
 EOF
 
-# Enable the site
-sudo ln -sf "/etc/nginx/sites-available/cocktail-machine" "/etc/nginx/sites-enabled/cocktail-machine"
+# Clean up any broken symlinks first
+sudo rm -f /etc/nginx/sites-enabled/sites-available
 sudo rm -f /etc/nginx/sites-enabled/default
+
+# Enable the site with proper symlink
+sudo ln -sf "/etc/nginx/sites-available/cocktail-machine" "/etc/nginx/sites-enabled/cocktail-machine"
 
 # Test nginx config and restart
 print_info "Testing nginx configuration..."
@@ -700,7 +704,9 @@ EOF
 # Create directories for services
 mkdir -p "$PROJECT_DIR"/{mosquitto/{config,data,log},nodered/data}
 
-# Set proper permissions for mosquitto directories
+# Set proper ownership and permissions for mosquitto directories
+# First set ownership to current user to avoid permission denied errors
+sudo chown -R $USER:$USER "$PROJECT_DIR"
 chmod -R 755 "$PROJECT_DIR/mosquitto"
 
 # Create mosquitto config

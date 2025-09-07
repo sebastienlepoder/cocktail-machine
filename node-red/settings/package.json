@@ -1,6 +1,6 @@
 {
     "name":  "cocktail-machine-nodered",
-    "version":  "1.0.6",
+    "version":  "1.0.7",
     "description":  "Node-RED flows and settings for Cocktail Machine",
     "dependencies":  {
                          "node-red-dashboard":  "^3.6.0",
