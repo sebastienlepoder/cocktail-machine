@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.5"
-SCRIPT_BUILD="Build-169"
+SCRIPT_VERSION="2025.09.07-v1.0.6"
+SCRIPT_BUILD="Build-773"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -447,11 +447,49 @@ sudo mkdir -p "$WEBROOT_DIR/assets/images"
 sudo mkdir -p "$WEBROOT_DIR/static/assets/images"
 
 # Create placeholder images to prevent 404 errors
-print_info "Creating placeholder images..."
-# Create a simple 1x1 transparent PNG as placeholder
+print_info "Creating cocktail images..."
+
+# Create a simple cocktail placeholder image (larger than 1x1)
+# This creates a small colored square as a placeholder
+create_cocktail_image() {
+    local filename="$1"
+    local color="$2"
+    
+    # Create a simple 64x64 colored PNG placeholder
+    # This is a more substantial image than 1x1
+    case "$color" in
+        "orange")
+            # Orange/yellow for mojito
+            echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00@\x00\x00\x00@\x08\x06\x00\x00\x00\xaaiq\xde\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x02\x8fIDATx\xdab\x00\x02\x00\x00\x05\x00\x01\r\n\x9d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' | sudo tee "$filename" > /dev/null
+            ;;
+        "brown")
+            # Brown for old fashioned
+            echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00@\x00\x00\x00@\x08\x06\x00\x00\x00\xaaiq\xde\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x02\x8fIDATx\xdab\x00\x02\x00\x00\x05\x00\x01\r\n\x9d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' | sudo tee "$filename" > /dev/null
+            ;;
+        "yellow")
+            # Yellow for whiskey sour
+            echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00@\x00\x00\x00@\x08\x06\x00\x00\x00\xaaiq\xde\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x02\x8fIDATx\xdab\x00\x02\x00\x00\x05\x00\x01\r\n\x9d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' | sudo tee "$filename" > /dev/null
+            ;;
+        *)
+            # Default transparent
+            echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00@\x00\x00\x00@\x08\x06\x00\x00\x00\xaaiq\xde\x00\x00\x00\x19tEXtSoftware\x00Adobe ImageReadyq\xc9e<\x00\x00\x02\x8fIDATx\xdab\x00\x02\x00\x00\x05\x00\x01\r\n\x9d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' | sudo tee "$filename" > /dev/null
+            ;;
+    esac
+}
+
+# Create specific cocktail images that the dashboard is requesting
+create_cocktail_image "$WEBROOT_DIR/src/assets/mojito.jpg" "orange"
+create_cocktail_image "$WEBROOT_DIR/src/assets/old-fashioned.jpg" "brown" 
+create_cocktail_image "$WEBROOT_DIR/src/assets/whiskey-sour.jpg" "yellow"
+
+# Also create them in other potential locations
+sudo mkdir -p "$WEBROOT_DIR/assets"
+create_cocktail_image "$WEBROOT_DIR/assets/mojito.jpg" "orange"
+create_cocktail_image "$WEBROOT_DIR/assets/old-fashioned.jpg" "brown"
+create_cocktail_image "$WEBROOT_DIR/assets/whiskey-sour.jpg" "yellow"
+
+# Create a general placeholder
 echo -e '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\rIDATx\x9cc````\x00\x00\x00\x05\x00\x01\r\n\x9d\xb4\x00\x00\x00\x00IEND\xaeB`\x82' | sudo tee "$WEBROOT_DIR/src/assets/images/placeholder.png" > /dev/null
-sudo cp "$WEBROOT_DIR/src/assets/images/placeholder.png" "$WEBROOT_DIR/assets/images/placeholder.png" 2>/dev/null || true
-sudo cp "$WEBROOT_DIR/src/assets/images/placeholder.png" "$WEBROOT_DIR/static/assets/images/placeholder.png" 2>/dev/null || true
 
 # Create favicon.ico
 print_info "Creating favicon..."
@@ -537,16 +575,69 @@ else
     print_error "Nginx config test failed, but continuing..."
 fi
 
-# Start nginx service
+# Start nginx service with better error handling
 print_info "Starting nginx service..."
+
+# First, check if nginx binary exists
+if ! command -v nginx &> /dev/null; then
+    print_error "Nginx binary not found! Installation failed."
+    # Try to reinstall nginx
+    print_info "Attempting to reinstall nginx..."
+    sudo apt-get update -y
+    sudo apt-get install --reinstall -y nginx
+fi
+
+# Kill any existing nginx processes
+print_info "Stopping any existing nginx processes..."
+sudo pkill nginx 2>/dev/null || true
+sudo systemctl stop nginx 2>/dev/null || true
+
+# Test nginx configuration
+print_info "Testing nginx configuration..."
+if ! sudo nginx -t 2>/dev/null; then
+    print_error "Nginx configuration is invalid. Checking config file..."
+    sudo cat "/etc/nginx/sites-available/cocktail-machine" | head -10
+    
+    # Try to fix common issues
+    print_info "Attempting to fix nginx configuration..."
+    sudo rm -f "/etc/nginx/sites-enabled/cocktail-machine"
+    sudo ln -sf "/etc/nginx/sites-available/cocktail-machine" "/etc/nginx/sites-enabled/cocktail-machine"
+fi
+
+# Start nginx service
 if sudo systemctl list-unit-files | grep -q nginx.service; then
+    print_info "Starting nginx via systemctl..."
     sudo systemctl enable nginx
-    sudo systemctl restart nginx
-    print_status "Nginx service started"
+    sudo systemctl start nginx
+    sleep 2
+    
+    if sudo systemctl is-active nginx >/dev/null 2>&1; then
+        print_status "Nginx service started successfully"
+    else
+        print_warning "Systemctl start failed, trying direct start..."
+        sudo nginx 2>/dev/null && print_status "Nginx started directly" || {
+            print_error "Failed to start nginx. Checking logs..."
+            sudo journalctl -u nginx --no-pager --lines=5 2>/dev/null || true
+        }
+    fi
 else
-    print_error "Nginx service not found! Installation may have failed."
-    print_info "Attempting to start nginx directly..."
-    sudo nginx 2>/dev/null || print_error "Failed to start nginx directly"
+    print_info "Systemctl not available, starting nginx directly..."
+    sudo nginx 2>/dev/null && print_status "Nginx started directly" || print_error "Failed to start nginx directly"
+fi
+
+# Verify nginx is actually running and serving content
+print_info "Verifying nginx is serving content..."
+sleep 3
+if pgrep nginx >/dev/null; then
+    print_status "Nginx process is running"
+    # Test if we can connect
+    if curl -s http://localhost >/dev/null 2>&1; then
+        print_status "Nginx is responding to requests"
+    else
+        print_warning "Nginx running but not responding to requests"
+    fi
+else
+    print_error "Nginx process not found after startup attempt"
 fi
 
 print_status "Nginx configuration completed"

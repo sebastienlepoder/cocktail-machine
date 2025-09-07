@@ -1,6 +1,6 @@
 {
     "name":  "cocktail-machine-dashboard",
-    "version":  "1.0.5",
+    "version":  "1.0.6",
     "description":  "Web dashboard for cocktail machine control and monitoring",
     "scripts":  {
                     "dev":  "next dev",
