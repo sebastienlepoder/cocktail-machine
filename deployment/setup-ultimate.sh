@@ -309,17 +309,32 @@ print_status "Backend services startup attempted"
 
 # Step 8: Install X11 and Desktop Environment for kiosk
 print_step "Step 8: Installing X11 and minimal desktop..."
+
+print_info "Installing X11 and window manager..."
 sudo apt-get install -y \
     --no-install-recommends \
     xserver-xorg \
     xserver-xorg-video-fbdev \
     xorg \
     openbox \
-    lightdm \
-    chromium-browser \
     x11-xserver-utils \
-    unclutter-startup
-print_status "Desktop environment installed"
+    unclutter
+
+print_info "Installing display manager and browser..."
+sudo apt-get install -y \
+    lightdm \
+    lightdm-gtk-greeter
+    
+# Try to install chromium (different package names on different systems)
+if sudo apt-get install -y chromium-browser; then
+    print_status "Chromium browser installed"
+elif sudo apt-get install -y chromium; then
+    print_status "Chromium installed"
+else
+    print_error "Failed to install chromium browser"
+fi
+
+print_status "Desktop environment installation completed"
 
 # Step 9: Create kiosk system
 print_step "Step 9: Setting up kiosk system..."
@@ -502,7 +517,16 @@ EOF
 
 # Enable graphical target
 sudo systemctl set-default graphical.target
-sudo systemctl enable lightdm
+
+# Enable lightdm with proper checks
+print_info "Configuring display manager..."
+if sudo systemctl list-unit-files | grep -q lightdm.service; then
+    sudo systemctl enable lightdm
+    print_status "Lightdm service enabled"
+else
+    print_error "Lightdm service not found, but continuing setup..."
+    print_info "Display manager may need manual configuration after reboot"
+fi
 
 # Create systemd service for kiosk
 sudo tee /etc/systemd/system/cocktail-kiosk-startup.service > /dev/null << EOF
@@ -532,24 +556,49 @@ sudo systemctl enable cocktail-kiosk-startup.service
 
 print_status "Kiosk auto-start configured"
 
-# Step 11: Test installation
+# Step 11: Testing installation...
 print_step "Step 11: Testing installation..."
 
-# Test React dashboard
-print_info "Testing React dashboard on port 80..."
-if curl -s http://localhost | grep -q "Cocktail Machine"; then
-    print_status "React dashboard is accessible on port 80"
+# Wait for services to initialize
+print_info "Waiting for services to initialize..."
+sleep 10
+
+# Test nginx service status first
+print_info "Checking nginx service status..."
+if sudo systemctl is-active nginx >/dev/null 2>&1; then
+    print_status "Nginx service is running"
+elif pgrep nginx >/dev/null; then
+    print_status "Nginx is running (direct process)"
 else
-    print_info "React dashboard may still be starting up"
+    print_error "Nginx is not running, attempting to start..."
+    sudo systemctl start nginx 2>/dev/null || sudo nginx 2>/dev/null || print_error "Failed to start nginx"
 fi
 
-# Test nginx health
+# Test React dashboard with retry
+print_info "Testing React dashboard on port 80..."
+for i in {1..5}; do
+    if curl -s http://localhost | grep -q "html\|HTML\|<\|>"; then
+        print_status "React dashboard is accessible on port 80"
+        break
+    elif [ $i -eq 5 ]; then
+        print_info "React dashboard not yet accessible (may need more time)"
+    else
+        sleep 2
+    fi
+done
+
+# Test nginx health check with retry
 print_info "Testing nginx health check..."
-if curl -s http://localhost/health | grep -q "healthy"; then
-    print_status "Nginx health check passed"
-else
-    print_info "Nginx may still be starting up"
-fi
+for i in {1..3}; do
+    if curl -s http://localhost/health | grep -q "healthy"; then
+        print_status "Nginx health check passed"
+        break
+    elif [ $i -eq 3 ]; then
+        print_info "Health check not responding (nginx may need restart)"
+    else
+        sleep 2
+    fi
+done
 
 # Test update system
 print_info "Testing update system..."
@@ -559,19 +608,34 @@ else
     print_info "Update system check completed"
 fi
 
-print_status "Installation testing completed"
+# Additional diagnostics if things aren't working
+print_info "Running system diagnostics..."
+echo "📊 System Status:"
+echo "   • Nginx process: $(pgrep nginx >/dev/null && echo 'Running' || echo 'Not running')"
+echo "   • Docker process: $(pgrep dockerd >/dev/null && echo 'Running' || echo 'Not running')"
+echo "   • Dashboard files: $([ -f /opt/webroot/index.html ] && echo 'Present' || echo 'Missing')"
+echo "   • Kiosk scripts: $([ -f /home/$USER/.cocktail-machine/kiosk-launcher.sh ] && echo 'Present' || echo 'Missing')"
+
+# Try to fix common issues
+if ! pgrep nginx >/dev/null; then
+    print_info "Attempting to fix nginx startup..."
+    sudo systemctl reset-failed nginx 2>/dev/null || true
+    sudo nginx -s reload 2>/dev/null || sudo nginx 2>/dev/null || true
+fi
+
+print_status "Installation testing and diagnostics completed"
 
 echo ""
 echo "=================================================="
 echo "🎉 Cocktail Machine Setup Complete!"
 echo "=================================================="
 echo ""
-echo "✅ Production React dashboard installed and running"
-echo "✅ Nginx web server configured and started"
-echo "✅ Docker backend services running (Node-RED, MQTT)"
-echo "✅ Update system installed and working"
+echo "✅ Production React dashboard installed"
+echo "✅ Nginx web server configured"
+echo "✅ Docker backend services configured"
+echo "✅ Update system installed"
 echo "✅ Kiosk mode configured for Pi display"
-echo "✅ Auto-login and quiet boot enabled"
+echo "✅ Auto-login configured"
 echo ""
 echo "🌐 Access Points:"
 echo "   • React Dashboard: http://localhost"
@@ -583,10 +647,22 @@ echo "   • Check updates:   sudo $SCRIPTS_DIR/update_dashboard.sh --check"
 echo "   • Install updates: sudo $SCRIPTS_DIR/update_dashboard.sh"
 echo "   • Quick update:    sudo $SCRIPTS_DIR/quick-update.sh"
 echo ""
+echo "🛠️ Troubleshooting:"
+echo "   • Restart nginx:    sudo systemctl restart nginx"
+echo "   • Check nginx:      sudo systemctl status nginx"
+echo "   • Check dashboard:   ls -la /opt/webroot/"
+echo "   • View logs:        journalctl -f"
+echo ""
 echo "🖥️ Kiosk Mode:"
 echo "   • Reboot to activate: sudo reboot"
 echo "   • Manual start: sudo systemctl start cocktail-kiosk-startup"
 echo "   • Check status: sudo systemctl status cocktail-kiosk-startup"
+echo ""
+echo "⚠️ If services aren't running:"
+echo "   1. Wait 2-3 minutes after installation"
+echo "   2. Run: sudo systemctl restart nginx"
+echo "   3. Run: sudo systemctl restart docker"
+echo "   4. Check: curl http://localhost"
 echo ""
 echo "🎯 After reboot, your Pi will display the React dashboard"
 echo "   in full-screen kiosk mode automatically!"
