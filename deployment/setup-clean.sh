@@ -4,8 +4,8 @@
 # Version: 2025.09.08-v1.0.11
 # Clean, working version with all fixes integrated
 
-SCRIPT_VERSION="2025.09.07-v1.0.11"
-SCRIPT_BUILD="Build-580"
+SCRIPT_VERSION="2025.09.08-v1.0.11"
+SCRIPT_BUILD="Build-001"
 
 echo "==================================================="
 echo "🍹 Cocktail Machine - Complete Installation"
