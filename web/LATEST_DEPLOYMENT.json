@@ -1,11 +1,11 @@
 {
-  "latest_version": "v2025.09.07.minor-b844f12",
-  "package_file": "dashboard-v2025.09.07.minor-b844f12.tar.gz",
+  "latest_version": "v2025.09.08.minor-b844f12",
+  "package_file": "dashboard-v2025.09.08.minor-b844f12.tar.gz",
   "package_size": "362K",
-  "deployment_date": "2025-09-07T22:02:53Z",
+  "deployment_date": "2025-09-08T02:19:42Z",
   "source_repo": "cocktail-slider-display",
   "source_commit": "b844f12",
   "release_type": "minor",
-  "release_notes": "bug fixes",
+  "release_notes": "fix minor bugs",
   "deployed_by": "GitHub Actions Web Deploy"
 }
