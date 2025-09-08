@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.15"
-SCRIPT_BUILD="Build-015"
+SCRIPT_VERSION="2025.09.07-v1.0.16"
+SCRIPT_BUILD="Build-016"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -1089,8 +1089,8 @@ done
 # Test Node-RED service
 print_info "Testing Node-RED service..."
 for i in {1..5}; do
-    if curl -s http://localhost:1880 >/dev/null 2>&1; then
-        print_status "Node-RED is accessible on port 1880"
+    if curl -s http://localhost:1880/ >/dev/null 2>&1; then
+        print_status "Node-RED admin panel is accessible on port 1880"
         break
     elif [ $i -eq 5 ]; then
         print_info "Node-RED not accessible after 5 attempts"
@@ -1101,6 +1101,14 @@ for i in {1..5}; do
         sleep 3
     fi
 done
+
+# Test Node-RED Dashboard
+print_info "Testing Node-RED Dashboard..."
+if curl -s http://localhost:1880/ui 2>&1 | grep -q "Cannot GET"; then
+    print_info "Dashboard not installed yet (will be available after installation completes)"
+else
+    print_status "Node-RED Dashboard UI is accessible at /ui"
+fi
 
 # Test update system
 print_info "Testing update system..."
