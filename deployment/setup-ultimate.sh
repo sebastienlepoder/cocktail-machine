@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.7"
-SCRIPT_BUILD="Build-487"
+SCRIPT_VERSION="2025.09.07-v1.0.8"
+SCRIPT_BUILD="Build-951"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -157,9 +157,80 @@ sudo mkdir -p "$WEBROOT_DIR" "$SCRIPTS_DIR"
 sudo chown -R www-data:www-data "$WEBROOT_DIR"
 sudo chmod -R 755 "$WEBROOT_DIR"
 
-# Create simple placeholder dashboard (same for both dev and prod)
-print_info "Creating cocktail machine dashboard..."
-mkdir -p /tmp/web
+# Download the actual web dashboard from the repository
+print_info "Downloading production React dashboard..."
+cd /tmp
+
+# Download the web dashboard package from GitHub
+DASHBOARD_URL="https://api.github.com/repos/$DEPLOY_REPO/releases/latest"
+print_info "Checking for latest dashboard release..."
+
+# Try to get the latest release package
+if curl -s "$DASHBOARD_URL" | jq -r '.assets[] | select(.name | contains("dashboard")) | .browser_download_url' | head -1 | grep -q "http"; then
+    DASHBOARD_PACKAGE_URL=$(curl -s "$DASHBOARD_URL" | jq -r '.assets[] | select(.name | contains("dashboard")) | .browser_download_url' | head -1)
+    print_info "Found dashboard package: $DASHBOARD_PACKAGE_URL"
+    
+    # Download and extract the dashboard
+    if curl -L -o dashboard.tar.gz "$DASHBOARD_PACKAGE_URL"; then
+        print_info "Extracting dashboard package..."
+        tar -xzf dashboard.tar.gz
+        
+        # Find the extracted dashboard files and copy them
+        if [ -d "dashboard" ]; then
+            sudo cp -rv dashboard/* "$WEBROOT_DIR/"
+            print_status "Dashboard files installed from package"
+        elif [ -f "index.html" ]; then
+            sudo cp -rv * "$WEBROOT_DIR/"
+            print_status "Dashboard files installed from archive"
+        else
+            print_error "Dashboard package does not contain expected files"
+            print_info "Package contents:"
+            ls -la
+            CREATE_FALLBACK=true
+        fi
+    else
+        print_error "Failed to download dashboard package"
+        CREATE_FALLBACK=true
+    fi
+else
+    print_info "No dashboard release package found, trying direct download from web directory..."
+    
+    # Try to download the web directory from the repo
+    WEB_ARCHIVE_URL="https://api.github.com/repos/$DEPLOY_REPO/contents/web"
+    if curl -s "$WEB_ARCHIVE_URL" | jq -r '.[].download_url' | head -1 | grep -q "http"; then
+        print_info "Downloading web files from repository..."
+        mkdir -p web_download
+        cd web_download
+        
+        # Download all files from the web directory
+        curl -s "$WEB_ARCHIVE_URL" | jq -r '.[] | "\(.name),\(.download_url)"' | while IFS=',' read name url; do
+            if [[ "$url" != "null" ]]; then
+                print_info "Downloading $name..."
+                curl -L -o "$name" "$url"
+            fi
+        done
+        
+        # Copy downloaded files to webroot
+        if [ "$(ls -A .)" ]; then
+            sudo cp -v * "$WEBROOT_DIR/"
+            print_status "Dashboard files downloaded from repository"
+        else
+            print_error "No files downloaded from repository"
+            CREATE_FALLBACK=true
+        fi
+        cd ..
+    else
+        print_error "No web directory found in repository"
+        CREATE_FALLBACK=true
+    fi
+fi
+
+# Create fallback dashboard only if download failed
+if [ "$CREATE_FALLBACK" = "true" ]; then
+    print_info "Creating fallback dashboard as last resort..."
+    print_error "Unable to download your web dashboard from repository!"
+    print_info "Creating minimal placeholder until dashboard can be properly deployed"
+    mkdir -p /tmp/web
 
 cat > /tmp/web/index.html << 'DASHBOARD_EOF'
 <!DOCTYPE html>
@@ -276,31 +347,18 @@ cat > /tmp/web/index.html << 'DASHBOARD_EOF'
 </html>
 DASHBOARD_EOF
 
-print_status "Dashboard created"
+    print_status "Fallback dashboard created as last resort"
+    
+    # Copy fallback dashboard to webroot
+    sudo cp /tmp/web/index.html "$WEBROOT_DIR/index.html"
+fi
+
+# Clean up temporary files
+cd /
+rm -rf /tmp/web /tmp/dashboard.tar.gz /tmp/web_download 2>/dev/null || true
 
 # Dashboard files are ready
-print_info "Dashboard files ready for installation"
-
-# Find and copy dashboard files
-print_info "Locating dashboard files..."
-if [ -d "web" ]; then
-    print_info "Found web directory, checking contents..."
-    
-    # Check if web directory contains built files or source files
-    if [ -f "web/index.html" ]; then
-        print_info "Found built React app, copying files..."
-        sudo cp -rv web/* "$WEBROOT_DIR/"
-    elif [ -f "web/.next" ] || [ -d "web/.next" ]; then
-        print_error "Found Next.js source with .next build directory"
-        print_info "Copying .next build output..."
-        sudo cp -rv web/.next/static/* "$WEBROOT_DIR/" 2>/dev/null || true
-        sudo cp -rv web/out/* "$WEBROOT_DIR/" 2>/dev/null || true
-    elif [ -f "web/package.json" ]; then
-        print_error "Found Next.js source code instead of built app"
-        print_info "Creating temporary dashboard as fallback..."
-        
-        # Create a simple fallback HTML page
-        sudo tee "$WEBROOT_DIR/index.html" > /dev/null << 'EOF'
+print_info "Dashboard installation completed"
 <!DOCTYPE html>
 <html lang="en">
 <head>
