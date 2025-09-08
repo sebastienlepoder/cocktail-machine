@@ -1,138 +1,2051 @@
 [
-  {
-    "id": "flow1",
-    "label": "Cocktail Machine Control",
-    "nodes": [
-      {
-        "id": "mqtt-in-1",
-        "type": "mqtt in",
-        "z": "flow1",
-        "name": "Bottle Status",
-        "topic": "cocktail/module/+/status",
-        "qos": "0",
-        "broker": "broker1",
-        "x": 100,
-        "y": 100,
-        "wires": [["status-processor"]]
-      },
-      {
-        "id": "mqtt-in-2",
-        "type": "mqtt in", 
-        "z": "flow1",
-        "name": "Bottle Levels",
-        "topic": "cocktail/module/+/level",
-        "qos": "0",
-        "broker": "broker1",
-        "x": 100,
-        "y": 160,
-        "wires": [["level-processor"]]
-      },
-      {
-        "id": "status-processor",
+    {
+        "id": "33d17d0bddc90511",
+        "type": "tab",
+        "label": "Cocktail Machine System - Online Modules",
+        "disabled": false,
+        "info": "Cocktail machine control system tracking online modules by unique ID"
+    },
+    {
+        "id": "tab_update_api_notoverride",
+        "type": "tab",
+        "label": "Update API (no-override)",
+        "disabled": false,
+        "info": "HTTP node uses URL={{ {url} }} so msg.url is templated, not overridden."
+    },
+    {
+        "id": "2ed35f273f6bb967",
+        "type": "ui_spacer",
+        "z": "33d17d0bddc90511",
+        "name": "spacer",
+        "group": "ui_group_overview",
+        "order": 2,
+        "width": "6",
+        "height": "1"
+    },
+    {
+        "id": "mqtt_broker",
+        "type": "mqtt-broker",
+        "name": "Local MQTT",
+        "broker": "mqtt",
+        "port": "1883",
+        "clientid": "nodered_cocktail_simple",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "cocktail/master/status",
+        "birthQos": "1",
+        "birthRetain": "true",
+        "birthPayload": "online",
+        "birthMsg": {},
+        "closeTopic": "cocktail/master/status",
+        "closeQos": "1",
+        "closeRetain": "true",
+        "closePayload": "offline",
+        "closeMsg": {},
+        "willTopic": "cocktail/master/status",
+        "willQos": "1",
+        "willRetain": "true",
+        "willPayload": "offline",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ui_group_registered",
+        "type": "ui_group",
+        "name": "Online Modules",
+        "tab": "ui_tab_modules",
+        "order": 2,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_control",
+        "type": "ui_group",
+        "name": "Module Control",
+        "tab": "ui_tab_modules",
+        "order": 3,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_testing",
+        "type": "ui_group",
+        "name": "Testing & Control",
+        "tab": "ui_tab_modules",
+        "order": 4,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_auth",
+        "type": "ui_group",
+        "name": "Access Control",
+        "tab": "ui_tab_settings",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_network",
+        "type": "ui_group",
+        "name": "Network Settings",
+        "tab": "ui_tab_settings",
+        "order": 2,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_overview",
+        "type": "ui_group",
+        "name": "System Overview",
+        "tab": "ui_tab_main",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_group_dashboard_modules",
+        "type": "ui_group",
+        "name": "Online Modules",
+        "tab": "ui_tab_main",
+        "order": 3,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "ui_tab_modules",
+        "type": "ui_tab",
+        "name": "Modules",
+        "icon": "local_drink",
+        "order": 2,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "ui_tab_settings",
+        "type": "ui_tab",
+        "name": "Settings",
+        "icon": "settings",
+        "order": 3,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "ui_tab_main",
+        "type": "ui_tab",
+        "name": "Dashboard",
+        "icon": "dashboard",
+        "order": 1,
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "44a805f1468b93b4",
+        "type": "global-config",
+        "env": []
+    },
+    {
+        "id": "ea34dbe8ca607f1d",
+        "type": "ui_base",
+        "theme": {
+            "name": "theme-light",
+            "lightTheme": {
+                "default": "#0094CE",
+                "baseColor": "#0094CE",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": true,
+                "reset": false
+            },
+            "darkTheme": {
+                "default": "#097479",
+                "baseColor": "#097479",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": false
+            },
+            "customTheme": {
+                "name": "Untitled Theme 1",
+                "default": "#4B7930",
+                "baseColor": "#4B7930",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+            },
+            "themeState": {
+                "base-color": {
+                    "default": "#0094CE",
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-titlebar-backgroundColor": {
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-backgroundColor": {
+                    "value": "#fafafa",
+                    "edited": false
+                },
+                "page-sidebar-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-textColor": {
+                    "value": "#1bbfff",
+                    "edited": false
+                },
+                "group-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "widget-textColor": {
+                    "value": "#111111",
+                    "edited": false
+                },
+                "widget-backgroundColor": {
+                    "value": "#0094ce",
+                    "edited": false
+                },
+                "widget-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "base-font": {
+                    "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+                }
+            },
+            "angularTheme": {
+                "primary": "indigo",
+                "accents": "blue",
+                "warn": "red",
+                "background": "grey",
+                "palette": "light"
+            }
+        },
+        "site": {
+            "name": "Node-RED Dashboard",
+            "hideToolbar": "false",
+            "allowSwipe": "false",
+            "lockMenu": "false",
+            "allowTempTheme": "true",
+            "dateFormat": "DD/MM/YYYY",
+            "sizes": {
+                "sx": 48,
+                "sy": 48,
+                "gx": 6,
+                "gy": 6,
+                "cx": 6,
+                "cy": 6,
+                "px": 0,
+                "py": 0
+            }
+        }
+    },
+    {
+        "id": "ui_group_updates",
+        "type": "ui_group",
+        "name": "Updates",
+        "tab": "ui_tab_main",
+        "order": 2,
+        "disp": true,
+        "width": "6",
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "63cbd6675e547278",
         "type": "function",
-        "z": "flow1",
-        "name": "Process Status",
-        "func": "// Process bottle status updates\nconst payload = JSON.parse(msg.payload);\nconst moduleId = payload.module_id;\n\n// Store in context for web dashboard\nconst bottles = flow.get('bottles') || {};\nbottles[moduleId] = {\n  ...bottles[moduleId],\n  status: payload.status,\n  wifi_connected: payload.wifi_connected,\n  mqtt_connected: payload.mqtt_connected,\n  ip_address: payload.ip_address,\n  last_seen: new Date().toISOString()\n};\n\nflow.set('bottles', bottles);\n\n// Forward to database storage\nmsg.table = 'bottle_status';\nmsg.payload = payload;\n\nreturn msg;",
-        "outputs": 1,
-        "x": 300,
-        "y": 100,
-        "wires": [["debug1"]]
-      },
-      {
-        "id": "level-processor", 
-        "type": "function",
-        "z": "flow1",
-        "name": "Process Levels",
-        "func": "// Process bottle level updates\nconst payload = JSON.parse(msg.payload);\nconst moduleId = payload.module_id;\n\n// Store in context\nconst bottles = flow.get('bottles') || {};\nbottles[moduleId] = {\n  ...bottles[moduleId],\n  level_percent: payload.level_percent,\n  level_ml: payload.level_ml,\n  last_level_update: new Date().toISOString()\n};\n\nflow.set('bottles', bottles);\n\n// Check for low level alerts\nif (payload.level_percent < 20) {\n  node.warn(`Low level alert: ${moduleId} at ${payload.level_percent}%`);\n  \n  // Send alert\n  const alertMsg = {\n    payload: {\n      type: 'low_level_alert',\n      module_id: moduleId,\n      level: payload.level_percent,\n      timestamp: new Date().toISOString()\n    },\n    topic: 'cocktail/alerts/low_level'\n  };\n  \n  node.send([msg, alertMsg]);\n  return;\n}\n\nreturn msg;",
-        "outputs": 1,
-        "x": 300,
-        "y": 160,
-        "wires": [["debug2"]]
-      },
-      {
-        "id": "recipe-handler",
-        "type": "http in",
-        "z": "flow1", 
-        "name": "Recipe API",
-        "url": "/api/recipe/execute",
-        "method": "post",
-        "x": 100,
-        "y": 300,
-        "wires": [["recipe-processor"]]
-      },
-      {
-        "id": "recipe-processor",
-        "type": "function",
-        "z": "flow1",
-        "name": "Execute Recipe",
-        "func": "// Execute cocktail recipe\nconst recipe = msg.payload;\nconst bottles = flow.get('bottles') || {};\n\n// Validate ingredients are available\nfor (const ingredient of recipe.ingredients) {\n  const bottle = bottles[ingredient.bottle_id];\n  if (!bottle || bottle.status !== 'online' || bottle.level_percent < 10) {\n    msg.statusCode = 400;\n    msg.payload = {\n      error: 'Ingredient unavailable',\n      ingredient: ingredient.bottle_id,\n      bottle_status: bottle?.status || 'unknown'\n    };\n    return msg;\n  }\n}\n\n// Calculate pump times based on amounts\nconst commands = [];\nfor (const ingredient of recipe.ingredients) {\n  const pumpTimeMs = (ingredient.amount / 10) * 1000; // 10ml/second\n  \n  commands.push({\n    topic: `cocktail/module/${ingredient.bottle_id}/pump/command`,\n    payload: JSON.stringify({\n      action: 'start',\n      duration_ms: pumpTimeMs,\n      speed: 255,\n      recipe_id: recipe.id,\n      timestamp: Date.now()\n    })\n  });\n}\n\n// Store recipe execution\nconst execution = {\n  recipe_id: recipe.id,\n  recipe_name: recipe.name,\n  ingredients: recipe.ingredients,\n  status: 'executing',\n  start_time: new Date().toISOString(),\n  commands: commands\n};\n\nflow.set('current_execution', execution);\n\n// Send pump commands\nmsg.payload = {\n  status: 'started',\n  recipe: recipe.name,\n  estimated_time: Math.max(...commands.map(c => JSON.parse(c.payload).duration_ms)) / 1000,\n  execution_id: execution.start_time\n};\n\n// Send commands to MQTT\nfor (const cmd of commands) {\n  node.send([null, cmd]);\n}\n\nreturn msg;",
-        "outputs": 2,
-        "x": 300,
-        "y": 300,
-        "wires": [["http-response"], ["mqtt-out"]]
-      },
-      {
-        "id": "http-response",
-        "type": "http response",
-        "z": "flow1",
-        "name": "API Response", 
-        "x": 500,
-        "y": 300,
-        "wires": []
-      },
-      {
-        "id": "mqtt-out",
-        "type": "mqtt out",
-        "z": "flow1",
-        "name": "Pump Commands",
+        "z": "33d17d0bddc90511",
+        "name": "Cleanup Obsolete Modules",
+        "func": "// Get all stored module IDs from both storage locations\nconst online = flow.get('online_modules') || {};\nconst active = global.get('active_modules') || {};\n\n// Collect ALL module IDs (both MOD_ and obsolete)\nconst allModuleIds = new Set();\nObject.keys(online).forEach(id => allModuleIds.add(id));\nObject.keys(active).forEach(id => allModuleIds.add(id));\n\nconst moduleArray = Array.from(allModuleIds);\n\nif (moduleArray.length === 0) {\n    return [{\n        notification: '✅ No modules found in storage to clear'\n    }];\n}\n\n// Clear ALL storage completely\nflow.set('online_modules', {});\nglobal.set('active_modules', {});\nglobal.set('selected_module_id', null);\n\n// Create clear messages for ALL modules in MQTT broker\nconst clearMessages = [];\nmoduleArray.forEach(id => {\n    clearMessages.push({\n        topic: `cocktail/bottle/${id}/status`,\n        payload: '',\n        retain: true\n    });\n    clearMessages.push({\n        topic: `cocktail/bottle/${id}/state`,\n        payload: '',\n        retain: true\n    });\n});\n\nconst notification = {\n    notification: `🧹 COMPLETE RESET: Cleared ${moduleArray.length} modules from storage and MQTT: ${moduleArray.join(', ')}`\n};\n\nnode.log(`Complete reset - cleared all modules: ${moduleArray.join(', ')}`);\nnode.log(`Sending ${clearMessages.length} MQTT clear messages`);\n\n// Return notification first, then all clear messages\nconst outputs = [notification];\nfor (let i = 0; i < clearMessages.length && i < 30; i++) {\n    outputs.push(clearMessages[i]);\n}\n\nreturn outputs;",
+        "outputs": 32,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 1700,
+        "wires": [
+            [],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ]
+        ]
+    },
+    {
+        "id": "9fa152cfec6ab0e8",
+        "type": "inject",
+        "z": "33d17d0bddc90511",
+        "name": "Initialize System",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "1",
         "topic": "",
+        "payload": "true",
+        "payloadType": "bool",
+        "x": 130,
+        "y": 60,
+        "wires": [
+            [
+                "befb8b7a38427470"
+            ]
+        ]
+    },
+    {
+        "id": "befb8b7a38427470",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Initialize Storage",
+        "func": "// Initialize all storage - using online_modules instead of registered\nflow.set('online_modules', flow.get('online_modules') || {});\nglobal.set('active_modules', {});\nglobal.set('selected_module_id', null);\nglobal.set('admin_authenticated', false);\n\n// Initialize pump duration with default value in both places\nflow.set('pump_duration', 1000);\nglobal.set('pump_duration', 1000);\n\n// Default network settings\nlet netSettings = flow.get('network_settings');\nif (!netSettings) {\n    flow.set('network_settings', {\n        home_ssid: '',\n        home_pass: '',\n        ap_ssid: 'CocktailMachine',\n        ap_pass: 'Cocktail2024!',\n        mqtt_host: '192.168.50.1',\n        mqtt_port: 1883\n    });\n}\n\nmsg.payload = {\n    status: 'System initialized - Online Module Tracking',\n    timestamp: new Date()\n};\nreturn msg;",
+        "outputs": 5,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 60,
+        "wires": [
+            [
+                "18ae3e61257abe92"
+            ],
+            [],
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "0d5cd26b0ad60db4",
+        "type": "mqtt in",
+        "z": "33d17d0bddc90511",
+        "name": "Module States",
+        "topic": "cocktail/bottle/+/state",
         "qos": "0",
-        "retain": "false",
-        "broker": "broker1",
-        "x": 500,
+        "datatype": "json",
+        "broker": "mqtt_broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 110,
+        "y": 140,
+        "wires": [
+            [
+                "750e178406f92e6a"
+            ]
+        ]
+    },
+    {
+        "id": "ac7fe9cb0c9e27fe",
+        "type": "mqtt in",
+        "z": "33d17d0bddc90511",
+        "name": "Module Status",
+        "topic": "cocktail/bottle/+/status",
+        "qos": "1",
+        "datatype": "auto",
+        "broker": "mqtt_broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 110,
+        "y": 200,
+        "wires": [
+            [
+                "77dcd7ea4e9efe25"
+            ]
+        ]
+    },
+    {
+        "id": "750e178406f92e6a",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Process State & Auto Register",
+        "func": "// Extract module ID from topic (this is the unchangeable ID)\nconst topicParts = msg.topic.split('/');\nconst moduleId = topicParts[2];\n\n// Only process modules with proper ID format (MOD_XXXXXX)\nif (!moduleId.startsWith('MOD_')) {\n    node.warn(`Ignoring obsolete module format: ${moduleId}`);\n    return null;\n}\n\nlet online = flow.get('online_modules') || {};\nlet active = global.get('active_modules') || {};\n\n// Get both ID and name from the message\nconst displayName = msg.payload.name || moduleId;\nconst fixedId = msg.payload.id || moduleId;\n\n// Double-check that the ID matches expected format\nif (!fixedId.startsWith('MOD_')) {\n    node.warn(`Ignoring module with invalid ID format: ${fixedId}`);\n    return null;\n}\n\n// Update active module with data (track by fixed ID)\nif (!active[fixedId]) {\n    active[fixedId] = {\n        id: fixedId,\n        name: displayName,\n        online: true,\n        state: msg.payload,\n        lastUpdate: new Date(),\n        firstSeen: new Date(),\n        dataPoints: 1\n    };\n} else {\n    active[fixedId].state = msg.payload;\n    active[fixedId].lastUpdate = new Date();\n    active[fixedId].online = true;\n    active[fixedId].dataPoints = (active[fixedId].dataPoints || 0) + 1;\n    \n    // Always update the name (it can change)\n    if (displayName) {\n        active[fixedId].name = displayName;\n        // Update online module name if it exists\n        if (online[fixedId]) {\n            online[fixedId].name = displayName;\n            flow.set('online_modules', online);\n        }\n    }\n}\n\nglobal.set('active_modules', active);\n\n// Auto-register module if not already online (track by ID)\nif (!online[fixedId]) {\n    online[fixedId] = {\n        id: fixedId,\n        name: displayName,\n        registered: new Date(),\n        auto_registered: true\n    };\n    flow.set('online_modules', online);\n    node.log(`Module ID ${fixedId} (${displayName}) auto-registered`);\n}\n\n// Return enhanced message\nmsg.moduleId = fixedId;\nmsg.moduleName = displayName;\nmsg.moduleData = active[fixedId];\n\nreturn [msg, msg];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 140,
+        "wires": [
+            [
+                "6af1fab4165ea9eb"
+            ],
+            [
+                "f2e4a19dbf018e3f"
+            ]
+        ]
+    },
+    {
+        "id": "77dcd7ea4e9efe25",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Process Status & Auto Register",
+        "func": "const topicParts = msg.topic.split('/');\nconst moduleId = topicParts[2];\nconst isOnline = (msg.payload === 'online');\n\n// Only process modules with proper ID format (MOD_XXXXXX)\nif (!moduleId.startsWith('MOD_')) {\n    node.warn(`Ignoring obsolete module status: ${moduleId}`);\n    return null;\n}\n\nlet online = flow.get('online_modules') || {};\nlet active = global.get('active_modules') || {};\n\n// Enhanced status tracking\nif (!active[moduleId]) {\n    active[moduleId] = {\n        id: moduleId,\n        name: moduleId, // Will be updated when state message arrives with proper name\n        online: isOnline,\n        state: {},\n        lastUpdate: new Date(),\n        firstSeen: new Date()\n    };\n} else {\n    active[moduleId].online = isOnline;\n    active[moduleId].lastUpdate = new Date();\n}\n\nglobal.set('active_modules', active);\n\n// Auto-register module if not already online and is online\nif (!online[moduleId] && isOnline) {\n    online[moduleId] = {\n        id: moduleId,\n        name: moduleId, // Will be updated when state arrives\n        registered: new Date(),\n        auto_registered: true\n    };\n    flow.set('online_modules', online);\n    node.log(`Module ID ${moduleId} auto-registered from status`);\n}\n\nmsg.moduleId = moduleId;\nmsg.isOnline = isOnline;\nmsg.moduleData = active[moduleId];\n\nreturn [msg, msg];",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 460,
+        "y": 200,
+        "wires": [
+            [
+                "6af1fab4165ea9eb"
+            ],
+            [
+                "f2e4a19dbf018e3f"
+            ]
+        ]
+    },
+    {
+        "id": "6af1fab4165ea9eb",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Update Online List",
+        "func": "const online = flow.get('online_modules') || {};\nconst active = global.get('active_modules') || {};\n\nlet onlineList = 'Online Modules:\\n';\nlet count = 0;\nlet options = [];\n\nfor (const key in online) {\n  count++;\n  const mod = online[key];\n  const am = active[key];\n\n  let status = 'Offline', level = '--', icon = '🔴';\n  if (am) {\n    const last = am.lastUpdate ? new Date(am.lastUpdate) : null;\n    const recent = last ? (Date.now() - last.getTime()) < 30000 : false;\n    if (am.online && recent) { status = 'Online'; icon = '🟢'; }\n    else if (am.online && !recent) { status = 'Stale'; icon = '🟡'; }\n    if (am.state?.valid) level = `${am.state.pct}%`;\n  }\n\n  const name = mod?.name || key;\n  const displayText = `${name} (${key})`; // Show name and ID\n  onlineList += `${count}. ${displayText} - ${level} - ${status}\\n`;\n  options.push({ label: `${icon} ${displayText} - ${level}`, value: key }); // value is the ID\n}\n\nif (count === 0) {\n  onlineList += 'No online modules';\n  options = [{ label: 'No modules online', value: '' }];\n}\n\n// Send both msg.options and msg.ui_control.options\nreturn [\n  { payload: '', options, ui_control: { replace: true, options } }\n];\n",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1100,
+        "y": 200,
+        "wires": [
+            [
+                "0c817db2ab7ede7e",
+                "77e4af1feeebc04d"
+            ]
+        ]
+    },
+    {
+        "id": "c3f06950f1c64fd6",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Store Selected Module",
+        "func": "if (msg.payload && msg.payload !== '') {\n    global.set('selected_module_id', msg.payload);\n    node.log(`Selected module ID: ${msg.payload}`);\n    msg.notification = `Selected for control: ${msg.payload}`;\n    return [msg, msg];\n}\nreturn [null, null];",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1700,
+        "y": 280,
+        "wires": [
+            [
+                "f2e4a19dbf018e3f"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "51d726ce5d949e7e",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Delete Module",
+        "group": "ui_group_registered",
+        "order": 3,
+        "width": "6",
+        "height": "1",
+        "passthru": false,
+        "label": "REMOVE SELECTED MODULE",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#F44336",
+        "className": "",
+        "icon": "delete",
+        "payload": "delete",
+        "payloadType": "str",
+        "topic": "delete",
+        "topicType": "str",
+        "x": 120,
+        "y": 400,
+        "wires": [
+            [
+                "6a68ea44083874a8"
+            ]
+        ]
+    },
+    {
+        "id": "6a68ea44083874a8",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Delete Module",
+        "func": "const selectedId = global.get('selected_module_id');\nif (!selectedId) {\n    msg.notification = '⚠️ Please select a module from the dropdown first';\n    return [null, msg];\n}\n\nlet online = flow.get('online_modules') || {};\nconst moduleName = online[selectedId] ? online[selectedId].name : selectedId;\n\n// Remove from online modules\ndelete online[selectedId];\nflow.set('online_modules', online);\n\n// Remove from active modules\nlet active = global.get('active_modules') || {};\ndelete active[selectedId];\nglobal.set('active_modules', active);\n\n// Clear selection after deletion\nglobal.set('selected_module_id', null);\n\nnode.log(`Module ${selectedId} removed from online list`);\n\n// Create MQTT clear messages to remove retained messages\nconst clearStatusMsg = {\n    topic: `cocktail/bottle/${selectedId}/status`,\n    payload: '',\n    retain: true\n};\n\nconst clearStateMsg = {\n    topic: `cocktail/bottle/${selectedId}/state`, \n    payload: '',\n    retain: true\n};\n\nmsg.notification = `🗑️ Module ${moduleName} removed and MQTT cleared`;\n\n// Return: [update trigger, notification, clear status, clear state, clear dropdown]\nreturn [msg, msg, clearStatusMsg, clearStateMsg, {payload: ''}];",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 400,
+        "wires": [
+            [
+                "2be8a907926d985a"
+            ]
+        ]
+    },
+    {
+        "id": "2be8a907926d985a",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Trigger Update",
+        "func": "return [msg, msg];",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 700,
+        "y": 400,
+        "wires": [
+            [
+                "18ae3e61257abe92"
+            ],
+            [
+                "6af1fab4165ea9eb"
+            ]
+        ]
+    },
+    {
+        "id": "f2e4a19dbf018e3f",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Update Module Display",
+        "func": "const selectedId = global.get('selected_module_id');\nif (!selectedId) {\n    return [\n        {payload: 0},\n        {payload: '--'},\n        {payload: '--'},\n        {payload: 'No module selected'},\n        {payload: 'Unknown'},\n        {payload: '--'}\n    ];\n}\n\nconst active = global.get('active_modules') || {};\nconst module = active[selectedId];\n\nif (!module) {\n    return [\n        {payload: 0},\n        {payload: '--'},\n        {payload: '--'},\n        {payload: selectedId},\n        {payload: 'Offline'},\n        {payload: 'Never'}\n    ];\n}\n\nconst state = module.state || {};\nconst timeDiff = new Date() - new Date(module.lastUpdate);\nconst isRecent = timeDiff < 30000; // Within 30 seconds\n\nlet statusText = 'Unknown';\nif (module.online && isRecent) {\n    statusText = 'Online';\n} else if (module.online && !isRecent) {\n    statusText = 'Stale Data';\n} else {\n    statusText = 'Offline';\n}\n\nconst lastSeenText = new Date(module.lastUpdate).toLocaleString();\n\nreturn [\n    {payload: state.valid ? state.pct : 0},\n    {payload: state.valid ? `${state.ml} mL` : '--'},\n    {payload: state.pump || 'STOP'},\n    {payload: module.name + ' (' + module.id + ')'}, // Show both name and ID\n    {payload: statusText},\n    {payload: lastSeenText}\n];",
+        "outputs": 6,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 2330,
+        "y": 460,
+        "wires": [
+            [
+                "da26f71c0e1d5714"
+            ],
+            [
+                "de53b95f8c91bc23"
+            ],
+            [
+                "992399592d6e8d8b"
+            ],
+            [
+                "ba88ce91b6a36358"
+            ],
+            [
+                "88b53ed2c9170eaa"
+            ],
+            [
+                "bc6151043381c9e9"
+            ]
+        ]
+    },
+    {
+        "id": "da26f71c0e1d5714",
+        "type": "ui_gauge",
+        "z": "33d17d0bddc90511",
+        "name": "Level Gauge",
+        "group": "ui_group_control",
+        "order": 1,
+        "width": "6",
+        "height": "4",
+        "gtype": "gage",
+        "title": "Level",
+        "label": "%",
+        "format": "{{value}}",
+        "min": 0,
+        "max": "100",
+        "colors": [
+            "#ff0000",
+            "#ffff00",
+            "#00ff00"
+        ],
+        "seg1": "30",
+        "seg2": "70",
+        "className": "",
+        "x": 2610,
         "y": 360,
         "wires": []
-      },
-      {
-        "id": "debug1",
-        "type": "debug",
-        "z": "flow1",
-        "name": "Status Debug",
-        "x": 500,
+    },
+    {
+        "id": "de53b95f8c91bc23",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_control",
+        "order": 2,
+        "width": "3",
+        "height": "1",
+        "name": "Volume",
+        "label": "Volume:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 2600,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "992399592d6e8d8b",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_control",
+        "order": 3,
+        "width": "3",
+        "height": "1",
+        "name": "Pump State",
+        "label": "Pump:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 2610,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "ba88ce91b6a36358",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_control",
+        "order": 4,
+        "width": "3",
+        "height": "1",
+        "name": "Module Name",
+        "label": "Name:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 2620,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "88b53ed2c9170eaa",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_control",
+        "order": 5,
+        "width": "3",
+        "height": "1",
+        "name": "Module Status",
+        "label": "Status:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 2620,
+        "y": 520,
+        "wires": []
+    },
+    {
+        "id": "bc6151043381c9e9",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_control",
+        "order": 6,
+        "width": "6",
+        "height": "1",
+        "name": "Last Seen",
+        "label": "Last Update:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "x": 2600,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "50a3455bf22a9bf2",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Pump FWD",
+        "group": "ui_group_testing",
+        "order": 1,
+        "width": "3",
+        "height": "2",
+        "passthru": false,
+        "label": "DOSE FWD",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#4CAF50",
+        "className": "",
+        "icon": "arrow_forward",
+        "payload": "FWD",
+        "payloadType": "str",
+        "topic": "pump",
+        "topicType": "str",
+        "x": 110,
+        "y": 760,
+        "wires": [
+            [
+                "de8595b001913fb1"
+            ]
+        ]
+    },
+    {
+        "id": "8d9d25c6bff678ba",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Pump REV",
+        "group": "ui_group_testing",
+        "order": 2,
+        "width": "3",
+        "height": "2",
+        "passthru": false,
+        "label": "PRIME REV",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#FF9800",
+        "className": "",
+        "icon": "arrow_back",
+        "payload": "REV",
+        "payloadType": "str",
+        "topic": "pump",
+        "topicType": "str",
+        "x": 110,
+        "y": 800,
+        "wires": [
+            [
+                "de8595b001913fb1"
+            ]
+        ]
+    },
+    {
+        "id": "d0bf5e2bf2586d88",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Pump STOP",
+        "group": "ui_group_testing",
+        "order": 3,
+        "width": "6",
+        "height": "2",
+        "passthru": false,
+        "label": "EMERGENCY STOP",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#F44336",
+        "className": "",
+        "icon": "stop",
+        "payload": "STOP",
+        "payloadType": "str",
+        "topic": "pump",
+        "topicType": "str",
+        "x": 110,
+        "y": 840,
+        "wires": [
+            [
+                "de8595b001913fb1"
+            ]
+        ]
+    },
+    {
+        "id": "7ad7bf888597a394",
+        "type": "ui_numeric",
+        "z": "33d17d0bddc90511",
+        "name": "Duration",
+        "label": "Duration (ms):",
+        "tooltip": "",
+        "group": "ui_group_testing",
+        "order": 4,
+        "width": "6",
+        "height": "1",
+        "wrap": false,
+        "passthru": true,
+        "topic": "duration",
+        "topicType": "str",
+        "format": "{{value}}",
+        "min": "500",
+        "max": "10000",
+        "step": "500",
+        "className": "",
+        "x": 100,
+        "y": 880,
+        "wires": [
+            [
+                "b8bbbff4566aa971"
+            ]
+        ]
+    },
+    {
+        "id": "b8bbbff4566aa971",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Store Duration",
+        "func": "const duration = parseInt(msg.payload) || 0;\nflow.set('pump_duration', duration);\nnode.log(`Pump duration set to: ${duration}ms`);\n// Also store in global for extra reliability\nglobal.set('pump_duration', duration);\nmsg.payload = duration;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 380,
+        "y": 880,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "de8595b001913fb1",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Fixed Pump Control",
+        "func": "const selectedModule = global.get('selected_module_id');\nif (!selectedModule) {\n    msg.notification = '⚠️ Please select a module first';\n    return [null, msg];\n}\n\n// Check if module is online\nconst active = global.get('active_modules') || {};\nconst moduleData = active[selectedModule];\nif (!moduleData || !moduleData.online) {\n    msg.notification = `❌ Module ${selectedModule} is offline`;\n    return [null, msg];\n}\n\n// Get duration from both flow and global storage for reliability\nlet duration = parseInt(flow.get('pump_duration')) || parseInt(global.get('pump_duration')) || 0;\nnode.log(`Using duration: ${duration}ms (flow: ${flow.get('pump_duration')}, global: ${global.get('pump_duration')})`);\n\nmsg.topic = `cocktail/bottle/${selectedModule}/cmd`;\n\nif (msg.payload === 'STOP') {\n    msg.payload = {\n        action: 'stop',\n        timestamp: new Date().toISOString(),\n        source: 'dashboard'\n    };\n    msg.notification = `🛑 Pump STOP sent to ${moduleData.name} (${moduleData.id})`;\n} else if (msg.payload === 'FWD') {\n    msg.payload = {\n        action: 'dose',\n        dir: 'FWD',\n        ms: duration,\n        timestamp: new Date().toISOString(),\n        source: 'dashboard'\n    };\n    msg.notification = `▶️ Pump FWD (${duration}ms) sent to ${moduleData.name} (${moduleData.id})`;\n} else if (msg.payload === 'REV') {\n    msg.payload = {\n        action: 'prime',\n        dir: 'REV',\n        ms: duration,\n        timestamp: new Date().toISOString(),\n        source: 'dashboard'\n    };\n    msg.notification = `◀️ Pump REV (${duration}ms) sent to ${moduleData.name} (${moduleData.id})`;\n}\n\n// Enhanced logging\nnode.log(`Pump command sent to ${selectedModule}: ${JSON.stringify(msg.payload)}`);\n\nreturn [msg, msg];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 800,
+        "wires": [
+            [
+                "6212aacb80081384"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "bcc1c7be97fd1b11",
+        "type": "ui_dropdown",
+        "z": "33d17d0bddc90511",
+        "name": "Name Dropdown",
+        "label": "Module Name:",
+        "tooltip": "",
+        "place": "Select name...",
+        "group": "ui_group_control",
+        "order": 7,
+        "width": "6",
+        "height": "1",
+        "passthru": true,
+        "multiple": false,
+        "options": [
+            {
+                "label": "Vodka",
+                "value": "Vodka",
+                "type": "str"
+            },
+            {
+                "label": "Rhum",
+                "value": "Rhum",
+                "type": "str"
+            },
+            {
+                "label": "Gin",
+                "value": "Gin",
+                "type": "str"
+            },
+            {
+                "label": "Whiskey",
+                "value": "Whiskey",
+                "type": "str"
+            },
+            {
+                "label": "Tequila",
+                "value": "Tequila",
+                "type": "str"
+            },
+            {
+                "label": "Triple Sec",
+                "value": "Triple Sec",
+                "type": "str"
+            },
+            {
+                "label": "Cranberry Juice",
+                "value": "Cranberry Juice",
+                "type": "str"
+            },
+            {
+                "label": "Orange Juice",
+                "value": "Orange Juice",
+                "type": "str"
+            },
+            {
+                "label": "Lime Juice",
+                "value": "Lime Juice",
+                "type": "str"
+            },
+            {
+                "label": "Simple Syrup",
+                "value": "Simple Syrup",
+                "type": "str"
+            },
+            {
+                "label": "Grenadine",
+                "value": "Grenadine",
+                "type": "str"
+            },
+            {
+                "label": "Soda Water",
+                "value": "Soda Water",
+                "type": "str"
+            },
+            {
+                "label": "Tonic Water",
+                "value": "Tonic Water",
+                "type": "str"
+            },
+            {
+                "label": "Ginger Beer",
+                "value": "Ginger Beer",
+                "type": "str"
+            },
+            {
+                "label": "Coca Cola",
+                "value": "Coca Cola",
+                "type": "str"
+            }
+        ],
+        "payload": "",
+        "topic": "name_dropdown",
+        "topicType": "str",
+        "className": "",
+        "x": 130,
+        "y": 940,
+        "wires": [
+            [
+                "3ce8f8238f91dc29"
+            ]
+        ]
+    },
+    {
+        "id": "3ce8f8238f91dc29",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Store Name",
+        "func": "// Debug logging\nnode.log(`Name input received: '${msg.payload}' from topic: '${msg.topic}'`);\n\nif (msg.topic === 'name_dropdown') {\n    // Use selected name from dropdown\n    flow.set('pending_name', msg.payload);\n    node.log(`Dropdown name stored: '${msg.payload}'`);\n}\n\nreturn null;",
+        "outputs": 0,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 940,
+        "wires": []
+    },
+    {
+        "id": "67df73a4a8674c5d",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Apply Name",
+        "group": "ui_group_control",
+        "order": 8,
+        "width": "6",
+        "height": "1",
+        "passthru": false,
+        "label": "APPLY NAME CHANGE",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#2196F3",
+        "className": "",
+        "icon": "check",
+        "payload": "apply",
+        "payloadType": "str",
+        "topic": "apply_name",
+        "topicType": "str",
+        "x": 110,
+        "y": 1020,
+        "wires": [
+            [
+                "29ce0f5658aaf692"
+            ]
+        ]
+    },
+    {
+        "id": "29ce0f5658aaf692",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Fixed Send Name Update",
+        "func": "const selectedModule = global.get('selected_module_id');\nif (!selectedModule) {\n    msg.notification = 'Please select a module first';\n    return [null, msg];\n}\n\nconst newName = flow.get('pending_name');\nnode.log(`Send name called - Selected ID: ${selectedModule}, Pending name: '${newName}'`);\n\nif (!newName || newName.trim() === '') {\n    msg.notification = 'Please enter a name';\n    return [null, msg];\n}\n\n// Check if module is online\nconst active = global.get('active_modules') || {};\nconst moduleData = active[selectedModule];\nif (!moduleData || !moduleData.online) {\n    msg.notification = `Module ${selectedModule} is offline`;\n    return [null, msg];\n}\n\n// Update stored data\nlet online = flow.get('online_modules') || {};\nif (online[selectedModule]) {\n    online[selectedModule].name = newName.trim();\n    flow.set('online_modules', online);\n}\n\nif (active[selectedModule]) {\n    active[selectedModule].name = newName.trim();\n    global.set('active_modules', active);\n}\n\n// Send command to module with correct format\nmsg.topic = `cocktail/bottle/${selectedModule}/cmd`;\nmsg.payload = {\n    action: 'set_name',\n    name: newName.trim(),\n    timestamp: new Date().toISOString(),\n    source: 'dashboard'\n};\n\nconst notification = {\n    notification: `Name change sent to ${selectedModule}: ${newName.trim()}`\n};\n\nnode.log(`Name change command sent to ${selectedModule}: ${newName.trim()}`);\nnode.log(`MQTT payload: ${JSON.stringify(msg.payload)}`);\n\nreturn [msg, notification];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 410,
+        "y": 1020,
+        "wires": [
+            [
+                "6212aacb80081384"
+            ],
+            []
+        ]
+    },
+    {
+        "id": "6f76300c904cbd02",
+        "type": "ui_text_input",
+        "z": "33d17d0bddc90511",
+        "name": "Password",
+        "label": "Admin Password:",
+        "tooltip": "",
+        "group": "ui_group_auth",
+        "order": 1,
+        "width": "4",
+        "height": "1",
+        "passthru": false,
+        "mode": "password",
+        "delay": "0",
+        "topic": "password",
+        "sendOnBlur": true,
+        "className": "",
+        "topicType": "str",
+        "x": 100,
+        "y": 1120,
+        "wires": [
+            [
+                "693fdf4ddb8f2015"
+            ]
+        ]
+    },
+    {
+        "id": "693fdf4ddb8f2015",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Check Password",
+        "func": "// Default password - CHANGE THIS!\nconst ADMIN_PASSWORD = 'cocktail2024';\n\nif (msg.payload === ADMIN_PASSWORD) {\n    global.set('admin_authenticated', true);\n    msg.notification = '🔓 Admin access granted';\n    msg.payload = true;\n} else {\n    global.set('admin_authenticated', false);\n    msg.notification = '🔒 Access denied - incorrect password';\n    msg.payload = false;\n}\n\nreturn [msg, msg];",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 390,
+        "y": 1120,
+        "wires": [
+            [
+                "2930714a3fadf126"
+            ]
+        ]
+    },
+    {
+        "id": "2930714a3fadf126",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_auth",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "Auth Status",
+        "label": "Status:",
+        "format": "{{msg.payload ? '🔓 Authenticated' : '🔒 Not Authenticated'}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 590,
+        "y": 1120,
+        "wires": []
+    },
+    {
+        "id": "0f2a582a0ac864c5",
+        "type": "ui_text_input",
+        "z": "33d17d0bddc90511",
+        "name": "Home SSID",
+        "label": "Home WiFi SSID:",
+        "tooltip": "",
+        "group": "ui_group_network",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "passthru": false,
+        "mode": "text",
+        "delay": "0",
+        "topic": "home_ssid",
+        "sendOnBlur": true,
+        "className": "",
+        "topicType": "str",
+        "x": 110,
+        "y": 1180,
+        "wires": [
+            [
+                "3d2bbb89e010114e"
+            ]
+        ]
+    },
+    {
+        "id": "9d0679c2ec75dd06",
+        "type": "ui_text_input",
+        "z": "33d17d0bddc90511",
+        "name": "Home Pass",
+        "label": "Home WiFi Pass:",
+        "tooltip": "",
+        "group": "ui_group_network",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "passthru": false,
+        "mode": "password",
+        "delay": "0",
+        "topic": "home_pass",
+        "sendOnBlur": true,
+        "className": "",
+        "topicType": "str",
+        "x": 110,
+        "y": 1220,
+        "wires": [
+            [
+                "3d2bbb89e010114e"
+            ]
+        ]
+    },
+    {
+        "id": "3d2bbb89e010114e",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Store Network Settings",
+        "func": "let settings = flow.get('network_settings') || {};\n\nif (msg.topic === 'home_ssid') {\n    settings.home_ssid = msg.payload;\n} else if (msg.topic === 'home_pass') {\n    settings.home_pass = msg.payload;\n}\n\nsettings.lastUpdated = new Date();\nflow.set('network_settings', settings);\nmsg.notification = '📶 Network settings updated';\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 1200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "57941053f13884df",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Apply Network",
+        "group": "ui_group_network",
+        "order": 3,
+        "width": "6",
+        "height": "2",
+        "passthru": false,
+        "label": "📶 APPLY NETWORK SETTINGS TO ALL MODULES",
+        "tooltip": "",
+        "color": "white",
+        "bgcolor": "#4CAF50",
+        "className": "",
+        "icon": "wifi",
+        "payload": "apply",
+        "payloadType": "str",
+        "topic": "apply_network",
+        "topicType": "str",
+        "x": 120,
+        "y": 1300,
+        "wires": [
+            [
+                "6da16a807e728403"
+            ]
+        ]
+    },
+    {
+        "id": "6da16a807e728403",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Apply Network to Modules",
+        "func": "const isAuthenticated = global.get('admin_authenticated');\nif (!isAuthenticated) {\n    msg.notification = '🔒 Admin authentication required';\n    return [null, msg];\n}\n\nconst settings = flow.get('network_settings') || {};\nif (!settings.home_ssid) {\n    msg.notification = '⚠️ Home SSID not configured';\n    return [null, msg];\n}\n\nconst active = global.get('active_modules') || {};\nconst onlineModules = Object.keys(active).filter(id => active[id].online);\n\nif (onlineModules.length === 0) {\n    msg.notification = '⚠️ No online modules to update';\n    return [null, msg];\n}\n\n// Create network update messages for all online modules\nconst networkMessages = onlineModules.map(moduleId => ({\n    topic: `cocktail/bottle/${moduleId}/cmd`,\n    payload: {\n        action: 'wifi',\n        ssid: settings.home_ssid,\n        pass: settings.home_pass,\n        timestamp: new Date().toISOString(),\n        source: 'network_update'\n    }\n}));\n\nmsg.notification = `📶 Network settings sent to ${onlineModules.length} module(s)`;\nnode.log(`Network update sent to modules: ${onlineModules.join(', ')}`);\n\n// Return notification and all network messages\nreturn [null, msg].concat(networkMessages);",
+        "outputs": 20,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 790,
+        "y": 1300,
+        "wires": [
+            [],
+            [],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ],
+            [
+                "6212aacb80081384"
+            ]
+        ]
+    },
+    {
+        "id": "18ae3e61257abe92",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "System Status",
+        "func": "let statusText = 'Cocktail Machine System - Online Module Tracking';\nlet statusColor = '#4caf50';\n\n\nreturn [\n    {payload: statusText, color: statusColor},\n];",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1080,
+        "y": 60,
+        "wires": [
+            [
+                "f487c0b619675120"
+            ]
+        ]
+    },
+    {
+        "id": "f487c0b619675120",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_overview",
+        "order": 1,
+        "width": "6",
+        "height": "1",
+        "name": "System Status",
+        "label": "",
+        "format": "<div style=\"text-align: center; font-size: 1.3em; font-weight: bold; color: {{msg.color}};\">{{msg.payload}}</div>",
+        "layout": "col-center",
+        "className": "",
+        "x": 1420,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "6212aacb80081384",
+        "type": "mqtt out",
+        "z": "33d17d0bddc90511",
+        "name": "MQTT Out",
+        "topic": "",
+        "qos": "1",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "mqtt_broker",
+        "x": 1430,
+        "y": 1200,
+        "wires": []
+    },
+    {
+        "id": "0c817db2ab7ede7e",
+        "type": "ui_template",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_registered",
+        "name": "Online Module List",
+        "order": 1,
+        "width": "6",
+        "height": "4",
+        "format": "<style>\n    .module-list {\n        margin: 0;\n        padding: 0;\n    }\n\n    .module-item {\n        padding: 10px 12px;\n        cursor: pointer;\n        border-bottom: 1px solid rgba(255, 255, 255, 0.08);\n        user-select: none;\n    }\n\n    .module-item:hover {\n        background: rgba(255, 255, 255, 0.06);\n    }\n\n    .module-item.active {\n        background: rgba(0, 150, 136, 0.25);\n    }\n\n    .placeholder {\n        opacity: 0.6;\n        padding: 10px 12px;\n    }\n</style>\n\n<div class=\"module-list\">\n    <div ng-if=\"!options || options.length===0\" class=\"placeholder\">\n        No modules available\n    </div>\n\n    <div class=\"module-item\" ng-repeat=\"opt in options track by $index\" ng-class=\"{active: $index===selectedIdx}\"\n        ng-click=\"select($index, opt)\">\n        {{opt.label}}\n    </div>\n</div>\n\n<script>\n    (function(scope){\n  scope.options = [];\n  scope.selectedIdx = -1;\n\n  function normalizeOptions(opts){\n    if (!Array.isArray(opts)) return null;\n    return opts.map(function(o){\n      if (typeof o === 'string') return { label: o, value: o };\n      return {\n        label: (o && (o.label ?? (o.value ?? ''))) + '',\n        value: (o && (o.value ?? '')) + ''\n      };\n    });\n  }\n\n  scope.select = function(idx, opt){\n    scope.selectedIdx = idx;\n    // Send the selected module ID as payload, label for convenience\n    scope.send({ payload: opt.value, label: opt.label, selectedIndex: idx });\n  };\n\n  // Only update the list when a message actually contains options.\n  scope.$watch('msg', function(msg){\n    if (!msg) return;\n\n    var opts = null;\n    if (Array.isArray(msg.options)) {\n      opts = normalizeOptions(msg.options);\n    } else if (msg.ui_control && Array.isArray(msg.ui_control.options)) {\n      opts = normalizeOptions(msg.ui_control.options);\n    }\n\n    if (opts) scope.options = opts;\n\n    // Optional: external clear\n    if (msg.action === 'clear') scope.selectedIdx = -1;\n  });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1440,
+        "y": 280,
+        "wires": [
+            [
+                "c3f06950f1c64fd6"
+            ]
+        ]
+    },
+    {
+        "id": "77e4af1feeebc04d",
+        "type": "ui_template",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_dashboard_modules",
+        "name": "Dashboard Module List",
+        "order": 2,
+        "width": "6",
+        "height": "4",
+        "format": "<style>\n    .module-list {\n        margin: 0;\n        padding: 0;\n    }\n\n    .module-item {\n        padding: 10px 12px;\n        border-bottom: 1px solid rgba(255, 255, 255, 0.08);\n        user-select: none;\n    }\n\n    .placeholder {\n        opacity: 0.6;\n        padding: 10px 12px;\n    }\n</style>\n\n<div class=\"module-list\">\n    <div ng-if=\"!options || options.length===0\" class=\"placeholder\">\n        No modules available\n    </div>\n\n    <div class=\"module-item\" ng-repeat=\"opt in options track by $index\">\n        {{removeModuleId(opt.label)}}\n    </div>\n</div>\n\n<script>\n    (function(scope){\n  scope.options = [];\n\n  function normalizeOptions(opts){\n    if (!Array.isArray(opts)) return null;\n    return opts.map(function(o){\n      if (typeof o === 'string') return { label: o, value: o };\n      return {\n        label: (o && (o.label ?? (o.value ?? ''))) + '',\n        value: (o && (o.value ?? '')) + ''\n      };\n    });\n  }\n\n  // Remove only the module ID part in parentheses, keep everything else\n  scope.removeModuleId = function(label) {\n    if (!label) return '';\n    // Remove the pattern \" (MOD_XXXXXX)\" but keep everything else\n    return label.replace(/\\s+\\([^)]*MOD_[^)]*\\)/, '');\n  };\n\n  // Only update the list when a message actually contains options.\n  scope.$watch('msg', function(msg){\n    if (!msg) return;\n\n    var opts = null;\n    if (Array.isArray(msg.options)) {\n      opts = normalizeOptions(msg.options);\n    } else if (msg.ui_control && Array.isArray(msg.ui_control.options)) {\n      opts = normalizeOptions(msg.ui_control.options);\n    }\n\n    if (opts) scope.options = opts;\n  });\n})(scope);\n</script>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1450,
+        "y": 200,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "9e52d555df769d13",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Reboot Pi",
+        "group": "ui_group_overview",
+        "order": 3,
+        "width": "6",
+        "height": "1",
+        "passthru": false,
+        "label": "Reboot System",
+        "tooltip": "Runs 'sudo reboot'",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "",
+        "payload": "",
+        "payloadType": "str",
+        "topic": "",
+        "topicType": "str",
+        "x": 80,
+        "y": 2040,
+        "wires": [
+            [
+                "b3f7388c6dbdba31"
+            ]
+        ]
+    },
+    {
+        "id": "b3f7388c6dbdba31",
+        "type": "exec",
+        "z": "33d17d0bddc90511",
+        "command": "/usr/bin/sudo /sbin/reboot",
+        "addpay": false,
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "sudo reboot",
+        "x": 430,
+        "y": 2060,
+        "wires": [
+            [],
+            [],
+            []
+        ]
+    },
+    {
+        "id": "21138c9c09f5da3a",
+        "type": "ui_button",
+        "z": "33d17d0bddc90511",
+        "name": "Cleanup Obsolete",
+        "group": "ui_group_registered",
+        "order": 4,
+        "width": "6",
+        "height": "1",
+        "passthru": false,
+        "label": "Clear Obsolete MQTT Topics",
+        "tooltip": "Clear retained messages from old module formats",
+        "color": "white",
+        "bgcolor": "#FF9800",
+        "className": "",
+        "icon": "cleaning_services",
+        "payload": "cleanup",
+        "payloadType": "str",
+        "topic": "cleanup_obsolete",
+        "topicType": "str",
+        "x": 140,
+        "y": 1700,
+        "wires": [
+            [
+                "63cbd6675e547278"
+            ]
+        ]
+    },
+    {
+        "id": "upd_inject_check",
+        "type": "inject",
+        "z": "33d17d0bddc90511",
+        "name": "Check Updates (startup + every 10m)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "600",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 210,
+        "y": 2400,
+        "wires": [
+            [
+                "upd_fn_build_req",
+                "upd_change_current_file"
+            ]
+        ]
+    },
+    {
+        "id": "upd_fn_build_req",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Build versions.json request",
+        "func": "// Build the GitHub RAW URL and auth header (for private repos)\nconst owner  = (env.get('GITHUB_OWNER') || 'sebastienlepoder');\nconst repo   = (env.get('DEPLOY_REPO') || 'cocktail-deploy');\nconst branch = (env.get('BRANCH') || 'main');\nconst token  = (env.get('RAW_GITHUB_TOKEN') || '');\n\nmsg.method = 'GET';\nmsg.url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/web/versions.json`;\nmsg.headers = token ? { Authorization: `token ${token}` } : {};\nmsg.topic = 'versions';\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 510,
+        "y": 2346,
+        "wires": [
+            [
+                "upd_http_versions"
+            ]
+        ]
+    },
+    {
+        "id": "upd_http_versions",
+        "type": "http request",
+        "z": "33d17d0bddc90511",
+        "name": "Fetch web/versions.json",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "senderr": false,
+        "x": 790,
+        "y": 2346,
+        "wires": [
+            [
+                "upd_join_parts"
+            ]
+        ]
+    },
+    {
+        "id": "upd_change_current_file",
+        "type": "change",
+        "z": "33d17d0bddc90511",
+        "name": "Read /opt/webroot/VERSION",
+        "rules": [
+            {
+                "t": "set",
+                "p": "filename",
+                "pt": "msg",
+                "to": "/opt/webroot/VERSION",
+                "tot": "str"
+            },
+            {
+                "t": "set",
+                "p": "topic",
+                "pt": "msg",
+                "to": "current",
+                "tot": "str"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 540,
+        "y": 2406,
+        "wires": [
+            [
+                "upd_file_current"
+            ]
+        ]
+    },
+    {
+        "id": "upd_file_current",
+        "type": "file in",
+        "z": "33d17d0bddc90511",
+        "name": "Read VERSION",
+        "filename": "",
+        "format": "utf8",
+        "chunk": false,
+        "sendError": true,
+        "encoding": "none",
+        "x": 790,
+        "y": 2406,
+        "wires": [
+            [
+                "upd_join_parts"
+            ]
+        ]
+    },
+    {
+        "id": "upd_join_parts",
+        "type": "join",
+        "z": "33d17d0bddc90511",
+        "name": "Combine {versions, current}",
+        "mode": "manual",
+        "build": "object",
+        "property": "payload",
+        "propertyType": "msg",
+        "key": "topic",
+        "joiner": "",
+        "joinerType": "auto",
+        "accumulate": false,
+        "timeout": "",
+        "count": "2",
+        "reduceRight": false,
+        "x": 1070,
+        "y": 2376,
+        "wires": [
+            [
+                "upd_fn_model"
+            ]
+        ]
+    },
+    {
+        "id": "upd_fn_model",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Assemble Update Model",
+        "func": "const d = msg.payload || {};\nconst versions = d.versions || {};\nconst current = (d.current || '').toString().trim() || 'v0.0.0';\n\nfunction parse(v){ const m=(v||'').replace(/^v/i,'').split('.').map(n=>parseInt(n||0,10)); return {M:m[0]||0,m:m[1]||0,p:m[2]||0}; }\nfunction lt(a,b){ const A=parse(a),B=parse(b); if(A.M!==B.M) return A.M<B.M; if(A.m!==B.m) return A.m<B.m; return A.p<B.p; }\n\nconst dash = versions.dashboard || {};\nconst mods = versions.modules || {};\nconst back = versions.backend || {};\n\nconst model = {\n  dashboard: {\n    current: current,\n    latest:  dash.latest || current,\n    notes:   Array.isArray(dash.notes) ? dash.notes : [],\n    artifact: dash.artifact || '',\n    updateAvailable: lt(current, dash.latest||current)\n  },\n  modules: {\n    latest:  mods.latest || '-',\n    notes:   Array.isArray(mods.notes) ? mods.notes : []\n  },\n  backend: {\n    latest:  back.latest || '-',\n    notes:   Array.isArray(back.notes) ? back.notes : []\n  }\n};\n\nflow.set('latest_dashboard_version', model.dashboard.latest);\nmsg.payload = model;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1340,
+        "y": 2376,
+        "wires": [
+            [
+                "upd_ui_panel"
+            ]
+        ]
+    },
+    {
+        "id": "upd_ui_panel",
+        "type": "ui_template",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_updates",
+        "name": "Updates Panel",
+        "order": 1,
+        "width": "6",
+        "height": "10",
+        "format": "<style>\n.card{background:#9fb4cc;border-radius:14px;padding:16px;margin:6px 0;box-shadow:0 2px 10px rgba(0,0,0,.25)}\n.h{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}\n.tt{font-weight:700;font-size:18px}\n.badge{font-size:12px;border-radius:999px;padding:4px 8px;background:#13c39b;color:#072}\n.badge.warn{background:#ff7043;color:#200}\n.kv{display:flex;gap:14px;font-size:13px;opacity:.9;margin:6px 0}\n.notes{font-size:13px;opacity:.85;margin-left:14px}\n.btn{display:inline-flex;align-items:center;gap:8px;border:none;border-radius:10px;padding:10px 14px;background:#74e6ff;color:#022;font-weight:600;cursor:pointer;margin-top:8px}\n.btn:disabled{opacity:.5;cursor:default}\n</style>\n<div ng-init=\"vm={}\"></div>\n<div ng-if=\"msg.payload\" ng-init=\"vm=msg.payload\">\n  <!-- Dashboard -->\n  <div class=\"card\">\n    <div class=\"h\">\n      <div class=\"tt\">Dashboard</div>\n      <div class=\"badge\" ng-class=\"{'warn': vm.dashboard.updateAvailable}\">\n        {{vm.dashboard.updateAvailable ? 'Update Available' : 'Up to Date'}}\n      </div>\n    </div>\n    <div class=\"kv\">\n      <div>Current: <b>{{vm.dashboard.current}}</b></div>\n      <div>Latest: <b>{{vm.dashboard.latest}}</b></div>\n    </div>\n    <div>Release Notes:</div>\n    <ul class=\"notes\">\n      <li ng-repeat=\"n in vm.dashboard.notes track by $index\">{{n}}</li>\n      <li ng-if=\"!vm.dashboard.notes || !vm.dashboard.notes.length\">—</li>\n    </ul>\n    <button class=\"btn\" ng-disabled=\"!vm.dashboard.updateAvailable\" ng-click=\"send({action:'install', target:'dashboard', version: vm.dashboard.latest})\">\n      <span class=\"material-icons\">system_update</span> Install Update\n    </button>\n  </div>\n\n  <!-- Bottle Modules -->\n  <div class=\"card\">\n    <div class=\"h\">\n      <div class=\"tt\">Bottle Modules</div>\n      <div class=\"badge warn\">Managed separately</div>\n    </div>\n    <div class=\"kv\"><div>Latest: <b>{{vm.modules.latest}}</b></div></div>\n    <div>Release Notes:</div>\n    <ul class=\"notes\">\n      <li ng-repeat=\"n in vm.modules.notes track by $index\">{{n}}</li>\n      <li ng-if=\"!vm.modules.notes || !vm.modules.notes.length\">—</li>\n    </ul>\n  </div>\n\n  <!-- Backend Flow -->\n  <div class=\"card\">\n    <div class=\"h\">\n      <div class=\"tt\">Backend Flow</div>\n      <div class=\"badge\">Up to Date</div>\n    </div>\n    <div class=\"kv\"><div>Latest: <b>{{vm.backend.latest}}</b></div></div>\n    <div>Release Notes:</div>\n    <ul class=\"notes\">\n      <li ng-repeat=\"n in vm.backend.notes track by $index\">{{n}}</li>\n      <li ng-if=\"!vm.backend.notes || !vm.backend.notes.length\">—</li>\n    </ul>\n  </div>\n</div>",
+        "storeOutMessages": true,
+        "fwdInMessages": true,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 1590,
+        "y": 2376,
+        "wires": [
+            [
+                "upd_fn_route_action"
+            ]
+        ]
+    },
+    {
+        "id": "upd_fn_route_action",
+        "type": "function",
+        "z": "33d17d0bddc90511",
+        "name": "Handle Install → Exec",
+        "func": "if (msg && msg.action === 'install' && msg.target === 'dashboard') {\n  const ver = msg.version || flow.get('latest_dashboard_version');\n  node.status({fill:'blue',shape:'dot',text:`Installing ${ver}…`});\n  // Exec node expects full command string as payload after -lc\n  msg.payload = `\\\"/opt/scripts/update_dashboard.sh ${ver}\\\"`;\n  return [msg, {payload:`Installing Dashboard ${ver}…` }];\n}\nreturn [null, {payload:'No action'}];",
+        "outputs": 2,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1855,
+        "y": 2376,
+        "wires": [
+            [
+                "upd_exec_install"
+            ],
+            [
+                "upd_ui_status"
+            ]
+        ]
+    },
+    {
+        "id": "upd_exec_install",
+        "type": "exec",
+        "z": "33d17d0bddc90511",
+        "command": "/bin/bash -lc",
+        "addpay": true,
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "Run update_dashboard.sh",
+        "x": 2160,
+        "y": 2500,
+        "wires": [
+            [
+                "upd_ui_status"
+            ],
+            [
+                "upd_ui_status"
+            ],
+            [
+                "upd_ui_status",
+                "upd_inject_check"
+            ]
+        ]
+    },
+    {
+        "id": "upd_ui_status",
+        "type": "ui_text",
+        "z": "33d17d0bddc90511",
+        "group": "ui_group_updates",
+        "order": 2,
+        "width": "6",
+        "height": "6",
+        "name": "Update Status",
+        "label": "Updater:",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": "",
+        "color": "#000000",
+        "x": 2540,
+        "y": 2380,
+        "wires": []
+    },
+    {
+        "id": "in_status_noovr",
+        "type": "http in",
+        "z": "tab_update_api_notoverride",
+        "name": "GET /api/update/status",
+        "url": "/api/update/status",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 170,
+        "y": 100,
+        "wires": [
+            [
+                "read_version_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "read_version_noovr",
+        "type": "file in",
+        "z": "tab_update_api_notoverride",
+        "name": "read /opt/webroot/VERSION",
+        "filename": "/opt/webroot/VERSION",
+        "format": "utf8",
+        "chunk": false,
+        "sendError": true,
+        "x": 430,
+        "y": 100,
+        "wires": [
+            [
+                "prep_contents_req_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "prep_contents_req_noovr",
+        "type": "function",
+        "z": "tab_update_api_notoverride",
+        "name": "prepare GitHub Contents API req",
+        "func": "// Keep current deployed version\nconst current = (msg.payload || \"\").toString().trim();\nmsg.currentVersion = current || null;\n\n// Build: https://api.github.com/repos/:owner/:repo/contents/web/versions.json?ref=:branch\nconst owner  = env.get('GITHUB_OWNER') || 'sebastienlepoder';\nconst repo   = env.get('DEPLOY_REPO')  || 'cocktail-deploy';\nconst branch = env.get('BRANCH')       || 'main';\nmsg.url = `https://api.github.com/repos/${owner}/${repo}/contents/web/versions.json?ref=${branch}`;\n\n// Headers\nconst tok = env.get('RAW_GITHUB_TOKEN') || '';\nmsg.headers = { 'User-Agent': 'cocktailpi', 'Accept': 'application/vnd.github+json' };\nif (tok) msg.headers.Authorization = `Bearer ${tok}`;\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 730,
+        "y": 100,
+        "wires": [
+            [
+                "http_fetch_versions_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "http_fetch_versions_noovr",
+        "type": "http request",
+        "z": "tab_update_api_notoverride",
+        "name": "Fetch web/versions.json",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "{{{url}}}",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "authType": "",
+        "senderr": true,
+        "headers": "{{{headers}}}",
+        "x": 1030,
+        "y": 100,
+        "wires": [
+            [
+                "decode_compare_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "decode_compare_noovr",
+        "type": "function",
+        "z": "tab_update_api_notoverride",
+        "name": "decode + parse + compare",
+        "func": "// Contents API returns base64 content in payload.content\nfunction parseArr(v){\n  v = (v||'').toString().trim().replace(/^v/i,'');\n  const m = v.match(/(\\d+)\\.(\\d+)\\.(\\d+)/);\n  if(!m) return [0,0,0];\n  return [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])];\n}\nfunction cmp(a,b){ for(let i=0;i<3;i++){ if(a[i]<b[i]) return -1; if(a[i]>b[i]) return 1; } return 0; }\n\nlet latestRaw = null;\ntry {\n  const api = msg.payload || {};\n  const text = Buffer.from(api.content || '', api.encoding || 'base64').toString('utf8');\n  const json = JSON.parse(text);\n  latestRaw = (json.dashboard && json.dashboard.latest) || json.latest || null;\n} catch (e) {\n  latestRaw = null;\n}\n\nconst current = msg.currentVersion; // e.g., v2.2.0\nlet updateAvailable = false;\nif (current && latestRaw) updateAvailable = cmp(parseArr(current), parseArr(latestRaw)) < 0;\nelse if (latestRaw && !current) updateAvailable = true;\n\nmsg.headers = {\"Access-Control-Allow-Origin\":\"*\"};\nmsg.payload = { current: current || null, latest: latestRaw || null, updateAvailable };\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1270,
+        "y": 100,
+        "wires": [
+            [
+                "out_status_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "out_status_noovr",
+        "type": "http response",
+        "z": "tab_update_api_notoverride",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1470,
         "y": 100,
         "wires": []
-      },
-      {
-        "id": "debug2", 
-        "type": "debug",
-        "z": "flow1",
-        "name": "Level Debug",
-        "x": 500,
+    },
+    {
+        "id": "in_update_noovr",
+        "type": "http in",
+        "z": "tab_update_api_notoverride",
+        "name": "POST /api/update/now",
+        "url": "/api/update/now",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 200,
+        "wires": [
+            [
+                "auth_choose_version_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "auth_choose_version_noovr",
+        "type": "function",
+        "z": "tab_update_api_notoverride",
+        "name": "auth + choose version → msg.payload",
+        "func": "const need = env.get('UPDATE_UI_TOKEN') || '';\nconst got  = (msg.req && msg.req.headers && msg.req.headers['x-update-token']) || '';\nif (need && got !== need) {\n    msg.statusCode = 403;\n    msg.headers = {\"Access-Control-Allow-Origin\":\"*\"};\n    msg.payload = { error: 'forbidden' };\n    return [null, msg];\n}\nlet body = {};\ntry { body = typeof msg.payload === 'object' ? msg.payload : JSON.parse(msg.payload || '{}'); } catch(e) {}\nconst ver = (body.version || 'latest').toString();\nmsg.payload = `/opt/scripts/update_dashboard.sh ${ver}`;\nreturn msg;",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 200,
+        "wires": [
+            [
+                "exec_update_noovr"
+            ],
+            [
+                "out_update_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "exec_update_noovr",
+        "type": "exec",
+        "z": "tab_update_api_notoverride",
+        "command": "/bin/bash -lc",
+        "addpay": "payload",
+        "append": "",
+        "useSpawn": "false",
+        "timer": "",
+        "winHide": false,
+        "oldrc": false,
+        "name": "run update_dashboard.sh",
+        "x": 750,
+        "y": 200,
+        "wires": [
+            [
+                "read_version_after_noovr"
+            ],
+            [],
+            [
+                "exec_err_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "exec_err_noovr",
+        "type": "function",
+        "z": "tab_update_api_notoverride",
+        "name": "normalize exec error",
+        "func": "msg.statusCode = 500;\nmsg.headers = {\"Access-Control-Allow-Origin\":\"*\"};\nmsg.payload = { ok:false, error: (msg.payload||'update failed') };\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1020,
+        "y": 280,
+        "wires": [
+            [
+                "out_update_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "read_version_after_noovr",
+        "type": "file in",
+        "z": "tab_update_api_notoverride",
+        "name": "read /opt/webroot/VERSION (after)",
+        "filename": "/opt/webroot/VERSION",
+        "format": "utf8",
+        "chunk": false,
+        "sendError": true,
+        "x": 1040,
         "y": 160,
+        "wires": [
+            [
+                "reply_ok_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "reply_ok_noovr",
+        "type": "function",
+        "z": "tab_update_api_notoverride",
+        "name": "CORS + success payload",
+        "func": "msg.headers = {\"Access-Control-Allow-Origin\":\"*\"};\nmsg.payload = { ok:true, version: (msg.payload||'').toString().trim() };\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1330,
+        "y": 200,
+        "wires": [
+            [
+                "out_update_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "out_update_noovr",
+        "type": "http response",
+        "z": "tab_update_api_notoverride",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1610,
+        "y": 200,
         "wires": []
-      }
-    ]
-  },
-  {
-    "id": "broker1",
-    "type": "mqtt-broker",
-    "name": "Cocktail MQTT",
-    "broker": "mosquitto",
-    "port": "1883",
-    "clientid": "nodered-cocktail",
-    "usetls": false,
-    "verifyservercert": true,
-    "compatmode": false,
-    "keepalive": "60",
-    "cleansession": true,
-    "birthTopic": "cocktail/nodered/status",
-    "birthQos": "0",
-    "birthPayload": "online",
-    "closeTopic": "cocktail/nodered/status", 
-    "closeQos": "0",
-    "closePayload": "offline",
-    "willTopic": "cocktail/nodered/status",
-    "willQos": "0",
-    "willPayload": "offline"
-  }
+    },
+    {
+        "id": "in_options_noovr",
+        "type": "http in",
+        "z": "tab_update_api_notoverride",
+        "name": "OPTIONS /api/update/now (CORS)",
+        "url": "/api/update/now",
+        "method": "options",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 210,
+        "y": 260,
+        "wires": [
+            [
+                "preflight_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "preflight_noovr",
+        "type": "function",
+        "z": "tab_update_api_notoverride",
+        "name": "preflight headers",
+        "func": "msg.statusCode = 204;\nmsg.headers = {\n  'Access-Control-Allow-Origin': '*',\n  'Access-Control-Allow-Headers': 'Content-Type, X-Update-Token',\n  'Access-Control-Allow-Methods': 'POST, OPTIONS'\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 480,
+        "y": 260,
+        "wires": [
+            [
+                "out_preflight_noovr"
+            ]
+        ]
+    },
+    {
+        "id": "out_preflight_noovr",
+        "type": "http response",
+        "z": "tab_update_api_notoverride",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 710,
+        "y": 260,
+        "wires": []
+    }
 ]
