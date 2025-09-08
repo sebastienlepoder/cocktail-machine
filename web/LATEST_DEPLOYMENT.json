@@ -1,11 +1,11 @@
 {
-  "latest_version": "v2025.09.08.minor-b844f12",
-  "package_file": "dashboard-v2025.09.08.minor-b844f12.tar.gz",
+  "latest_version": "v2025.09.08.patch-7c25b9c",
+  "package_file": "dashboard-v2025.09.08.patch-7c25b9c.tar.gz",
   "package_size": "362K",
-  "deployment_date": "2025-09-08T02:19:42Z",
+  "deployment_date": "2025-09-08T03:23:25Z",
   "source_repo": "cocktail-slider-display",
-  "source_commit": "b844f12",
-  "release_type": "minor",
-  "release_notes": "fix minor bugs",
+  "source_commit": "7c25b9c",
+  "release_type": "patch",
+  "release_notes": "remove black frame on home page",
   "deployed_by": "GitHub Actions Web Deploy"
 }
