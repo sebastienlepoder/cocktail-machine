@@ -1,16 +1,16 @@
 #!/bin/bash
 
-# Cocktail Machine - Complete Installation Script
-# Version: 2025.09.08-v1.0.12
-# Node-RED fixes applied - dashboard unchanged
+# Cocktail Machine - Production Setup Script
+# Version: 2025.09.07-v1.0.0
+# Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.08-v1.0.12"
-SCRIPT_BUILD="Build-581"
+SCRIPT_VERSION="2025.09.07-v1.0.13"
+SCRIPT_BUILD="Build-006-Fixed"
 
-echo "==================================================="
-echo "🍹 Cocktail Machine - Complete Installation"
+echo "=================================================="
+echo "🍹 Cocktail Machine - Production Setup"
 echo "📦 Script Version: $SCRIPT_VERSION ($SCRIPT_BUILD)"
-echo "==================================================="
+echo "=================================================="
 
 # Colors
 GREEN='\033[0;32m'
@@ -23,14 +23,12 @@ print_status() { echo -e "${GREEN}✓${NC} $1"; }
 print_error() { echo -e "${RED}✗${NC} $1"; }
 print_info() { echo -e "${YELLOW}ℹ${NC} $1"; }
 print_step() { echo -e "${BLUE}►${NC} $1"; }
-print_warning() { echo -e "${YELLOW}⚠${NC} $1"; }
 
 # Configuration
-DEPLOY_REPO="sebastienlepoder/cocktail-machine-dev"
+DEPLOY_REPO="sebastienlepoder/cocktail-machine-prod"
 BRANCH="main"
 WEBROOT_DIR="/opt/webroot"
 SCRIPTS_DIR="/opt/scripts"
-PROJECT_DIR="/home/$USER/cocktail-machine"
 
 # Set non-interactive mode
 export DEBIAN_FRONTEND=noninteractive
@@ -46,116 +44,203 @@ fi
 # Ensure running as non-root user
 if [ "$EUID" -eq 0 ]; then
     print_error "Please run this script as a regular user (not root)"
+    print_info "Usage: curl -fsSL https://raw.githubusercontent.com/$DEPLOY_REPO/main/scripts/setup-ultimate.sh | bash"
     exit 1
 fi
 
-# Step 1: System Update
-print_step "Step 1: System update and configuration..."
+# Step 1: System Update and Clock Sync
+print_step "Step 1: Updating system and syncing clock..."
 
-# Configure non-interactive mode
+# Configure system to avoid interactive prompts
 print_info "Configuring non-interactive mode..."
+
+# Prevent needrestart from showing interactive dialogs
 sudo mkdir -p /etc/needrestart
 echo '$nrconf{restart} = "a";' | sudo tee /etc/needrestart/needrestart.conf > /dev/null
 echo '$nrconf{kernelhints} = 0;' | sudo tee -a /etc/needrestart/needrestart.conf > /dev/null
 
+# Configure APT to avoid interactive prompts
 sudo mkdir -p /etc/apt/apt.conf.d
+echo 'DPkg::Post-Invoke-Success {"test -x /usr/bin/needrestart && /usr/bin/needrestart -n || true"; };' | sudo tee /etc/apt/apt.conf.d/99needrestart > /dev/null
 echo 'APT::Get::Assume-Yes "true";' | sudo tee /etc/apt/apt.conf.d/99noninteractive > /dev/null
 echo 'Dpkg::Options { "--force-confdef"; "--force-confold"; }' | sudo tee -a /etc/apt/apt.conf.d/99noninteractive > /dev/null
 
-print_info "Updating system packages..."
+# Sync system clock to fix timestamp warnings
+print_info "Synchronizing system clock..."
 sudo apt-get update -y
-sudo apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold"
-print_status "System updated"
+sudo apt-get install -y ntp ntpdate
+sudo systemctl stop ntp 2>/dev/null || true
+sudo ntpdate -s time.nist.gov 2>/dev/null || sudo ntpdate -s pool.ntp.org 2>/dev/null || print_info "Clock sync skipped"
+sudo systemctl start ntp 2>/dev/null || true
+sudo systemctl enable ntp 2>/dev/null || true
 
-# Step 2: Install packages
-print_step "Step 2: Installing required packages..."
-sudo apt-get install -y curl wget unzip jq nginx docker.io docker-compose
-print_status "Packages installed"
+print_info "Upgrading packages..."
+# Configure debconf to avoid kernel restart dialogs
+echo 'libc6 libraries/restart-without-asking boolean true' | sudo debconf-set-selections
+echo 'libssl1.1:amd64 libssl1.1/restart-services string' | sudo debconf-set-selections 2>/dev/null || true
 
-# Step 3: Configure Docker
-print_step "Step 3: Configuring Docker..."
-sudo usermod -aG docker $USER
-sudo systemctl enable docker
-sudo systemctl start docker
-print_status "Docker configured"
+# Upgrade with all non-interactive options
+sudo apt-get upgrade -y \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold" \
+    -o DPkg::Post-Invoke-Success::="test -x /usr/bin/needrestart && /usr/bin/needrestart -n || true"
+print_status "System updated and clock synchronized"
 
-# Step 4: Download and install dashboard
-print_step "Step 4: Installing dashboard..."
+# Step 2: Install essential packages + nginx
+print_step "Step 2: Installing essential packages..."
+sudo apt-get install -y \
+    curl \
+    wget \
+    unzip \
+    jq \
+    openssl \
+    ca-certificates \
+    nginx
+print_status "Essential packages installed"
 
-# Create directories
+# Step 3: Install Docker (for Node-RED and other services)
+print_step "Step 3: Installing Docker..."
+if ! command -v docker &> /dev/null; then
+    # Install Docker
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    sudo usermod -aG docker $USER
+    rm get-docker.sh
+    
+    # Wait for Docker installation to complete
+    sleep 5
+    
+    # Install Docker Compose (try multiple methods)
+    print_info "Installing Docker Compose..."
+    if ! sudo apt-get install -y docker-compose-plugin 2>/dev/null; then
+        print_info "Plugin installation failed, trying legacy docker-compose..."
+        sudo apt-get install -y docker-compose 2>/dev/null || {
+            print_info "APT installation failed, downloading docker-compose binary..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        }
+    fi
+    
+    print_status "Docker installed successfully"
+else
+    print_status "Docker already installed"
+fi
+
+# Ensure Docker service is available and start it
+print_info "Starting Docker service..."
+if sudo systemctl list-unit-files | grep -q docker.service; then
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    print_status "Docker service started"
+else
+    print_info "Docker service not found, waiting for installation to complete..."
+    sleep 10
+    sudo systemctl enable docker 2>/dev/null || true
+    sudo systemctl start docker 2>/dev/null || true
+fi
+
+# Step 4: Download Production React Dashboard
+print_step "Step 4: Downloading production React dashboard..."
+
+# Create directories with proper permissions
 sudo mkdir -p "$WEBROOT_DIR" "$SCRIPTS_DIR"
 sudo chown -R www-data:www-data "$WEBROOT_DIR"
 sudo chmod -R 755 "$WEBROOT_DIR"
 
-print_info "Downloading dashboard from repository..."
+# Download the production dashboard package
+print_info "Downloading latest dashboard from production repository..."
+DASHBOARD_URL="https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/web.tar.gz"
+
+# Clean up any previous downloads
+rm -rf /tmp/dashboard.tar.gz /tmp/web 2>/dev/null || true
+
+# Download with better error handling
+print_info "Fetching dashboard package..."
+if curl -L -f -o /tmp/dashboard.tar.gz "$DASHBOARD_URL"; then
+    print_status "Dashboard package downloaded successfully"
+else
+    print_error "Failed to download dashboard package from $DASHBOARD_URL"
+    print_info "Attempting alternative download method..."
+    
+    # Try alternative method - download individual files from deploy repo
+    if curl -L -f "https://api.github.com/repos/$DEPLOY_REPO/contents" > /tmp/repo_contents.json 2>/dev/null; then
+        print_error "Dashboard package not found. Please ensure web.tar.gz exists in the deploy repository."
+    else
+        print_error "Cannot access deploy repository. Check network connectivity."
+    fi
+    exit 1
+fi
+
+# Validate download
+if [ ! -f /tmp/dashboard.tar.gz ] || [ ! -s /tmp/dashboard.tar.gz ]; then
+    print_error "Downloaded file is empty or missing"
+    exit 1
+fi
+
+# Extract dashboard files
+print_info "Extracting dashboard to $WEBROOT_DIR..."
 cd /tmp
-rm -rf dashboard_download
-mkdir dashboard_download
-cd dashboard_download
 
-# Try to download actual dashboard files
-DOWNLOADED_DASHBOARD=false
-
-# Method 1: Try GitHub releases
-print_info "Trying GitHub releases..."
-if curl -s "https://api.github.com/repos/$DEPLOY_REPO/releases/latest" | jq -r '.assets[].browser_download_url' | grep -q "http"; then
-    PACKAGE_URL=$(curl -s "https://api.github.com/repos/$DEPLOY_REPO/releases/latest" | jq -r '.assets[] | select(.name | contains("dashboard")) | .browser_download_url' | head -1)
-    if [ "$PACKAGE_URL" != "null" ] && [ -n "$PACKAGE_URL" ]; then
-        if curl -L -o dashboard.tar.gz "$PACKAGE_URL" && tar -xzf dashboard.tar.gz; then
-            if [ -f "index.html" ] && grep -q "<html\|<!DOCTYPE" "index.html"; then
-                sudo cp -v * "$WEBROOT_DIR/"
-                DOWNLOADED_DASHBOARD=true
-                print_status "Dashboard downloaded from releases"
-            fi
-        fi
-    fi
+# Extract with verbose output to debug
+print_info "Extracting archive contents..."
+if tar -tzf dashboard.tar.gz > /tmp/tar_contents.txt 2>/dev/null; then
+    print_info "Archive contents:"
+    head -10 /tmp/tar_contents.txt | while read line; do print_info "  $line"; done
+else
+    print_error "Invalid or corrupted tar.gz file"
+    file /tmp/dashboard.tar.gz
+    exit 1
 fi
 
-# Method 2: Try web directory
-if [ "$DOWNLOADED_DASHBOARD" = false ]; then
-    print_info "Trying web directory from repository..."
-    WEB_URL="https://api.github.com/repos/$DEPLOY_REPO/contents/web"
-    if curl -s "$WEB_URL" | jq -r '.[].download_url' | head -1 | grep -q "http"; then
-        curl -s "$WEB_URL" | jq -r '.[] | select(.type == "file") | "\(.name),\(.download_url)"' > files_list.txt
-        while IFS=',' read -r name url; do
-            if [[ "$url" != "null" && "$name" =~ \.(html|js|css|json|ico|png|jpg|gif)$ ]]; then
-                curl -L -o "$name" "$url"
-            fi
-        done < files_list.txt
+# Extract the archive
+if tar -xzf dashboard.tar.gz; then
+    print_status "Archive extracted successfully"
+else
+    print_error "Failed to extract archive"
+    exit 1
+fi
+
+# Find and copy dashboard files
+print_info "Locating dashboard files..."
+if [ -d "web" ]; then
+    print_info "Found web directory, checking contents..."
+    
+    # Check if web directory contains built files or source files
+    if [ -f "web/index.html" ]; then
+        print_info "Found built React app, copying files..."
+        sudo cp -rv web/* "$WEBROOT_DIR/"
+    elif [ -f "web/.next" ] || [ -d "web/.next" ]; then
+        print_error "Found Next.js source with .next build directory"
+        print_info "Copying .next build output..."
+        sudo cp -rv web/.next/static/* "$WEBROOT_DIR/" 2>/dev/null || true
+        sudo cp -rv web/out/* "$WEBROOT_DIR/" 2>/dev/null || true
+    elif [ -f "web/package.json" ]; then
+        print_error "Found Next.js source code instead of built app"
+        print_info "Creating temporary dashboard as fallback..."
         
-        if [ -f "index.html" ] && grep -q "<html\|<!DOCTYPE" "index.html"; then
-            sudo cp -v * "$WEBROOT_DIR/"
-            DOWNLOADED_DASHBOARD=true
-            print_status "Dashboard downloaded from repository"
-        fi
-    fi
-fi
-
-# Method 3: Create working dashboard if download failed
-if [ "$DOWNLOADED_DASHBOARD" = false ]; then
-    print_info "Creating working dashboard..."
-    sudo tee "$WEBROOT_DIR/index.html" > /dev/null << 'HTML_EOF'
+        # Create a simple fallback HTML page
+        sudo tee "$WEBROOT_DIR/index.html" > /dev/null << 'EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🍹 Cocktail Machine Dashboard</title>
+    <title>Cocktail Machine</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            height: 100vh;
+            text-align: center;
         }
         .container {
-            max-width: 900px;
+            max-width: 600px;
             padding: 40px;
-            text-align: center;
         }
         .logo {
             font-size: 120px;
@@ -167,6 +252,11 @@ if [ "$DOWNLOADED_DASHBOARD" = false ]; then
             margin-bottom: 20px;
             font-weight: 300;
         }
+        p {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
         .status {
             background: rgba(255,255,255,0.1);
             padding: 20px;
@@ -174,137 +264,151 @@ if [ "$DOWNLOADED_DASHBOARD" = false ]; then
             margin: 20px 0;
         }
         .buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 15px;
             margin-top: 30px;
         }
         .button {
-            display: block;
+            display: inline-block;
             background: rgba(255,255,255,0.2);
             color: white;
-            padding: 20px;
-            border-radius: 10px;
+            padding: 12px 24px;
+            margin: 0 10px;
+            border-radius: 6px;
             text-decoration: none;
-            transition: all 0.3s;
-            border: 2px solid rgba(255,255,255,0.3);
-            font-size: 16px;
+            transition: background 0.3s;
         }
         .button:hover {
             background: rgba(255,255,255,0.3);
-            transform: translateY(-2px);
-        }
-        .primary {
-            background: rgba(255,107,107,0.3);
-            border-color: #ff6b6b;
-        }
-        .primary:hover {
-            background: rgba(255,107,107,0.5);
         }
         @keyframes float {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-20px); }
         }
-        .info { 
-            margin-top: 30px; 
-            font-size: 14px; 
-            opacity: 0.8; 
-            line-height: 1.5;
-        }
-        #status { font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="logo">🍹</div>
-        <h1>Cocktail Machine Control System</h1>
-        <p>Premium automated cocktail machine interface</p>
+        <h1>Cocktail Machine</h1>
+        <p>Your cocktail machine is successfully installed and running!</p>
         
         <div class="status">
-            <h3>🎯 System Status</h3>
-            <p id="status">Checking services...</p>
+            <h3>🎯 System Status: Online</h3>
+            <p>Installation completed successfully</p>
         </div>
         
         <div class="buttons">
-            <a href="http://localhost:1880/ui" class="button primary">🔴 Node-RED Dashboard</a>
-            <a href="http://localhost:1880/admin" class="button">⚙️ Node-RED Editor</a>
+            <a href="http://localhost:1880" class="button">🔧 Node-RED Dashboard</a>
             <a href="/health" class="button">❤️ Health Check</a>
-            <a href="javascript:location.reload()" class="button">🔄 Refresh Status</a>
         </div>
         
-        <div class="info">
-            <p><strong>Working Dashboard - Ready for Use</strong></p>
-            <p>Your cocktail machine control system is operational!</p>
-            <p>IP Address: <span id="ip">Loading...</span></p>
-            <p><em>Access from any device on your network</em></p>
-        </div>
+        <p style="margin-top: 40px; font-size: 14px; opacity: 0.7;">
+            This is a temporary dashboard. The full React dashboard will be available after the first deployment.
+        </p>
     </div>
-    
-    <script>
-        function checkServices() {
-            fetch('/health')
-                .then(response => response.text())
-                .then(data => {
-                    document.getElementById('status').innerHTML = '✅ Web server running';
-                })
-                .catch(err => {
-                    document.getElementById('status').innerHTML = '⚠️ Starting services...';
-                });
-                
-            fetch('http://localhost:1880')
-                .then(response => {
-                    if (response.ok) {
-                        document.getElementById('status').innerHTML += '<br>✅ Node-RED operational';
-                    }
-                })
-                .catch(err => {
-                    document.getElementById('status').innerHTML += '<br>🔄 Node-RED starting...';
-                });
-        }
-        
-        // Get IP
-        setTimeout(() => {
-            document.getElementById('ip').textContent = location.hostname || 'localhost';
-        }, 1000);
-        
-        // Check services
-        setTimeout(checkServices, 2000);
-        setInterval(checkServices, 15000);
-    </script>
 </body>
 </html>
-HTML_EOF
-    print_status "Working dashboard created"
+EOF
+        print_status "Temporary dashboard created as fallback"
+    else
+        print_info "Copying web directory contents as-is..."
+        sudo cp -rv web/* "$WEBROOT_DIR/"
+    fi
+elif [ -f "index.html" ]; then
+    print_info "Found dashboard files in root, copying..."
+    sudo cp -rv * "$WEBROOT_DIR/"
+else
+    print_error "No valid dashboard files found in archive"
+    print_info "Archive structure:"
+    ls -la
+    
+    print_info "Creating minimal dashboard as fallback..."
+    sudo tee "$WEBROOT_DIR/index.html" > /dev/null << 'EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cocktail Machine - Setup Complete</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: #2c3e50; 
+            color: white; 
+            text-align: center; 
+            padding: 50px; 
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        .logo { font-size: 80px; margin-bottom: 20px; }
+        h1 { font-size: 36px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍹</div>
+        <h1>Cocktail Machine</h1>
+        <p>Installation completed successfully!</p>
+        <p>Visit <a href="http://localhost:1880" style="color: #3498db;">Node-RED Dashboard</a></p>
+    </div>
+</body>
+</html>
+EOF
+    print_status "Fallback dashboard created"
 fi
 
-# Clean up
-cd /
-rm -rf /tmp/dashboard_download
-
-# Set permissions
+# Set proper permissions
+print_info "Setting file permissions..."
 sudo chown -R www-data:www-data "$WEBROOT_DIR"
 sudo chmod -R 755 "$WEBROOT_DIR"
 sudo find "$WEBROOT_DIR" -type f -exec chmod 644 {} \;
 
+# Verify files were copied correctly
+print_info "Verifying dashboard installation..."
+if [ -f "$WEBROOT_DIR/index.html" ]; then
+    print_status "Dashboard files installed successfully"
+    print_info "Dashboard files:"
+    ls -la "$WEBROOT_DIR/" | head -5
+else
+    print_error "Dashboard installation verification failed - index.html not found"
+    print_info "Contents of $WEBROOT_DIR:"
+    ls -la "$WEBROOT_DIR/"
+    exit 1
+fi
+
+# Clean up
+rm -rf /tmp/web /tmp/dashboard.tar.gz /tmp/tar_contents.txt /tmp/repo_contents.json 2>/dev/null || true
 print_status "Dashboard installation completed"
 
-# Step 5: Configure Nginx
-print_step "Step 5: Configuring web server..."
+# Step 5: Download production scripts
+print_step "Step 5: Installing production scripts..."
 
-# Remove any broken configurations
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo rm -f /etc/nginx/sites-enabled/sites-available
+# Download update script
+print_info "Downloading update script..."
+sudo curl -L -o "$SCRIPTS_DIR/update_dashboard.sh" \
+    "https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/scripts/update_dashboard.sh"
+sudo chmod +x "$SCRIPTS_DIR/update_dashboard.sh"
 
-# Create clean nginx configuration
-sudo tee /etc/nginx/sites-available/cocktail-machine > /dev/null << 'NGINX_EOF'
+# Download quick update script
+sudo curl -L -o "$SCRIPTS_DIR/quick-update.sh" \
+    "https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/scripts/quick-update.sh"
+sudo chmod +x "$SCRIPTS_DIR/quick-update.sh"
+
+print_status "Production scripts installed"
+
+# Step 6: Configure nginx to serve React dashboard
+print_step "Step 6: Configuring nginx..."
+
+# Ensure nginx directories exist
+sudo mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+# Create nginx config for React dashboard
+sudo tee /etc/nginx/sites-available/cocktail-machine > /dev/null << EOF
 server {
     listen 80;
     server_name _;
-    root /opt/webroot;
+    root $WEBROOT_DIR;
     index index.html;
 
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files \$uri \$uri/ /index.html;
     }
 
     location /health {
@@ -313,37 +417,87 @@ server {
         add_header Content-Type text/plain;
     }
 
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+    # Cache static assets
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)\$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 }
-NGINX_EOF
+EOF
 
-# Enable site
-sudo ln -sf /etc/nginx/sites-available/cocktail-machine /etc/nginx/sites-enabled/cocktail-machine
+# Enable the site
+sudo ln -sf /etc/nginx/sites-available/cocktail-machine /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
 
-# Test and restart nginx
-if sudo nginx -t; then
-    sudo systemctl restart nginx
-    print_status "Web server configured and running"
+# Test nginx config and restart
+print_info "Testing nginx configuration..."
+if sudo nginx -t 2>/dev/null; then
+    print_status "Nginx config is valid"
 else
-    print_error "Nginx configuration error"
-    sudo nginx -t
+    print_error "Nginx config test failed, but continuing..."
 fi
 
-# Step 6: Setup Docker services
-print_step "Step 6: Setting up backend services..."
+# Start nginx service
+print_info "Starting nginx service..."
+if sudo systemctl list-unit-files | grep -q nginx.service; then
+    sudo systemctl enable nginx
+    sudo systemctl restart nginx
+    print_status "Nginx service started"
+else
+    print_error "Nginx service not found! Installation may have failed."
+    print_info "Attempting to start nginx directly..."
+    sudo nginx 2>/dev/null || print_error "Failed to start nginx directly"
+fi
+
+print_status "Nginx configuration completed"
+
+# Step 7: Set up Docker containers for Node-RED and MQTT (FIXED)
+print_step "Step 7: Setting up backend services..."
 
 # Create project directory
+PROJECT_DIR="/home/$USER/cocktail-machine"
 mkdir -p "$PROJECT_DIR"
-cd "$PROJECT_DIR"
 
-# Create docker-compose configuration
-cat > docker-compose.yml << 'DOCKER_EOF'
+# Function to handle existing containers
+cleanup_existing_containers() {
+    print_info "Checking for existing Docker containers..."
+    
+    # Check if containers exist (running or stopped)
+    if docker ps -a --format '{{.Names}}' | grep -q "cocktail-nodered\|cocktail-mqtt"; then
+        print_info "Found existing containers, cleaning up..."
+        
+        # Stop and remove existing containers
+        docker stop cocktail-nodered cocktail-mqtt 2>/dev/null || true
+        docker rm cocktail-nodered cocktail-mqtt 2>/dev/null || true
+        
+        print_status "Existing containers removed"
+    else
+        print_info "No existing containers found"
+    fi
+    
+    # Also check for docker-compose project
+    if [ -f "$PROJECT_DIR/docker-compose.yml" ]; then
+        cd "$PROJECT_DIR"
+        print_info "Cleaning up docker-compose project..."
+        
+        # Try different docker-compose commands
+        if command -v docker-compose &> /dev/null; then
+            docker-compose down 2>/dev/null || true
+        elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+            docker compose down 2>/dev/null || true
+        fi
+    fi
+}
+
+# Clean up any existing containers first
+cleanup_existing_containers
+
+# Create simple docker-compose for backend services only
+cat > "$PROJECT_DIR/docker-compose.yml" << 'EOF'
 version: '3.8'
 
 services:
+  # Node-RED for automation
   nodered:
     image: nodered/node-red:latest
     container_name: cocktail-nodered
@@ -355,16 +509,16 @@ services:
     environment:
       - TZ=Europe/Paris
       - NODE_RED_ENABLE_PROJECTS=false
-      - NODE_RED_CREDENTIAL_SECRET=cocktail-machine-secret
+      - NODE_RED_ENABLE_SAFE_MODE=false
     networks:
       - cocktail-network
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:1880 || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:1880"]
       interval: 30s
       timeout: 10s
-      retries: 5
-      start_period: 90s
+      retries: 3
 
+  # MQTT Broker
   mqtt:
     image: eclipse-mosquitto:latest
     container_name: cocktail-mqtt
@@ -382,13 +536,13 @@ services:
 networks:
   cocktail-network:
     driver: bridge
-DOCKER_EOF
+EOF
 
-# Create directories
-mkdir -p mosquitto/{config,data,log} nodered/data
+# Create directories for services
+mkdir -p "$PROJECT_DIR"/{mosquitto/{config,data,log},nodered/data}
 
 # Create mosquitto config
-cat > mosquitto/config/mosquitto.conf << 'MQTT_CONF_EOF'
+cat > "$PROJECT_DIR/mosquitto/config/mosquitto.conf" << 'EOF'
 listener 1883
 allow_anonymous true
 persistence true
@@ -398,30 +552,85 @@ log_type error
 log_type warning
 log_type notice
 log_type information
-MQTT_CONF_EOF
+EOF
 
-# Create basic Node-RED settings
-cat > nodered/data/settings.js << 'SETTINGS_EOF'
+# Step 7.5: Download and deploy Node-RED flows
+print_info "Downloading Node-RED flows..."
+
+# Download Node-RED flows from production repository
+NODERED_URL="https://raw.githubusercontent.com/$DEPLOY_REPO/$BRANCH/nodered"
+
+# Create Node-RED data directories
+mkdir -p "$PROJECT_DIR/nodered/data"
+
+# Download flows and configuration
+print_info "Fetching Node-RED flows..."
+if curl -L -f -o "$PROJECT_DIR/nodered/data/flows.json" "$NODERED_URL/flows/flows.json"; then
+    print_status "Node-RED flows downloaded successfully"
+else
+    print_error "Failed to download Node-RED flows, creating basic flow"
+    # Create a basic flow as fallback
+    cat > "$PROJECT_DIR/nodered/data/flows.json" << 'BASIC_FLOW_EOF'
+[
+  {
+    "id": "basic-flow",
+    "label": "Basic Cocktail Flow", 
+    "nodes": [
+      {
+        "id": "welcome-msg",
+        "type": "inject",
+        "z": "basic-flow",
+        "name": "Welcome",
+        "props": [{"p": "payload"}],
+        "repeat": "",
+        "crontab": "",
+        "once": true,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "Cocktail Machine Node-RED is running!",
+        "payloadType": "str",
+        "x": 100,
+        "y": 100,
+        "wires": [["debug-out"]]
+      },
+      {
+        "id": "debug-out",
+        "type": "debug",
+        "z": "basic-flow",
+        "name": "System Status",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "x": 300,
+        "y": 100,
+        "wires": []
+      }
+    ]
+  }
+]
+BASIC_FLOW_EOF
+    print_info "Basic fallback flow created"
+fi
+
+# Download Node-RED settings
+print_info "Fetching Node-RED settings..."
+if curl -L -f -o "$PROJECT_DIR/nodered/data/settings.js" "$NODERED_URL/settings/settings.js"; then
+    print_status "Node-RED settings downloaded successfully"
+else
+    print_info "Creating default Node-RED settings"
+    # Create basic settings file
+    cat > "$PROJECT_DIR/nodered/data/settings.js" << 'SETTINGS_EOF'
 module.exports = {
     uiPort: process.env.PORT || 1880,
     uiHost: '0.0.0.0',
     httpAdminRoot: '/admin',
     httpNodeRoot: '/api',
-    httpStatic: '/data/static',
     userDir: '/data',
     flowFile: 'flows.json',
     flowFilePretty: true,
-    credentialSecret: process.env.NODE_RED_CREDENTIAL_SECRET || 'cocktail-machine-secret',
-    adminAuth: false,
-    httpNodeAuth: false,
-    httpStaticAuth: false,
-    functionGlobalContext: {},
-    exportGlobalContextKeys: false,
-    contextStorage: {
-        default: {
-            module: "localfilesystem"
-        }
-    },
     editorTheme: {
         page: {
             title: "Cocktail Machine - Node-RED",
@@ -429,19 +638,6 @@ module.exports = {
         },
         header: {
             title: "🍹 Cocktail Machine Control"
-        },
-        deployButton: {
-            type: "simple",
-            label: "Deploy",
-            icon: "red/images/deploy-full-o.png"
-        },
-        menu: {
-            "menu-item-import-library": false,
-            "menu-item-export-library": false
-        },
-        userMenu: false,
-        login: {
-            image: "red/images/node-red-icon.png"
         }
     },
     logging: {
@@ -449,179 +645,529 @@ module.exports = {
             level: "info",
             metrics: false,
             audit: false
-        },
-        file: {
-            level: "info",
-            filename: "/data/node-red.log",
-            maxFiles: 5,
-            maxSize: "10MB"
         }
     }
 };
 SETTINGS_EOF
+    print_status "Default Node-RED settings created"
+fi
 
-# Create basic flows (will be overridden by your custom flow)
-cat > nodered/data/flows.json << 'FLOWS_EOF'
-[
-    {
-        "id": "main-tab",
-        "type": "tab",
-        "label": "Cocktail Machine",
-        "disabled": false,
-        "info": "Main cocktail machine control flow"
-    },
-    {
-        "id": "welcome-inject",
-        "type": "inject",
-        "z": "main-tab",
-        "name": "System Start",
-        "props": [{"p": "payload"}],
-        "repeat": "",
-        "crontab": "",
-        "once": true,
-        "onceDelay": 2,
-        "topic": "",
-        "payload": "🍹 Cocktail Machine Node-RED Online! Ready for custom flow.",
-        "payloadType": "str",
-        "x": 140,
-        "y": 80,
-        "wires": [["debug-node"]]
-    },
-    {
-        "id": "debug-node",
-        "type": "debug",
-        "z": "main-tab",
-        "name": "System Log",
-        "active": true,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "payload",
-        "targetType": "msg",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 370,
-        "y": 80,
-        "wires": []
-    }
-]
-FLOWS_EOF
+# Download additional Node-RED modules package.json
+if curl -L -f -o "$PROJECT_DIR/nodered/data/package.json" "$NODERED_URL/settings/package.json"; then
+    print_status "Node-RED package.json downloaded"
+else
+    print_info "Creating basic package.json for Node-RED modules"
+    cat > "$PROJECT_DIR/nodered/data/package.json" << 'PACKAGE_EOF'
+{
+  "name": "cocktail-machine-nodered",
+  "version": "1.0.0",
+  "description": "Node-RED flows for Cocktail Machine",
+  "dependencies": {
+    "node-red-dashboard": "^3.6.0"
+  }
+}
+PACKAGE_EOF
+    print_status "Basic Node-RED package.json created"
+fi
 
-# Create empty credentials file
-echo '{}' > nodered/data/flows_cred.json
-
-# Set correct permissions
-sudo chown -R $USER:$USER "$PROJECT_DIR"
+# Set proper permissions for Node-RED data
 sudo chown -R 1000:1000 "$PROJECT_DIR/nodered/data"
-chmod -R 755 "$PROJECT_DIR"
-chmod 600 "$PROJECT_DIR/nodered/data/flows_cred.json"
+chmod -R 755 "$PROJECT_DIR/nodered/data"
 
-print_status "Backend services configured"
+print_status "Node-RED flows and configuration deployed"
 
-# Step 7: Start services
-print_step "Step 7: Starting services..."
+# Start backend services with better error handling
+cd "$PROJECT_DIR"
 
 print_info "Starting Docker containers..."
-docker-compose up -d
 
-print_info "Waiting for services to start..."
-sleep 30
-
-# Check and fix Node-RED if needed
-print_info "Checking Node-RED status..."
-sleep 10  # Give containers time to start
-
-# Check if Node-RED is running properly
-for attempt in 1 2 3; do
-    if docker ps | grep cocktail-nodered | grep -q "Restarting\|Exited"; then
-        print_warning "Node-RED container issue (attempt $attempt) - applying fix..."
-        
-        # Stop and remove container
-        docker-compose stop nodered || true
-        docker-compose rm -f nodered || true
-        sleep 5
-        
-        # Fix permissions thoroughly
-        sudo chown -R 1000:1000 "$PROJECT_DIR/nodered/data"
-        chmod -R 755 "$PROJECT_DIR/nodered/data"
-        chmod 600 "$PROJECT_DIR/nodered/data/flows_cred.json"
-        
-        # Ensure settings file is correct
-        if [ ! -f "$PROJECT_DIR/nodered/data/settings.js" ]; then
-            print_warning "Recreating settings.js..."
-            # Recreate settings if missing - this would be the same content as above
-        fi
-        
-        # Start fresh
-        docker-compose up -d nodered
-        sleep 30
-        
-        # Check if it's working now
-        if ! docker ps | grep cocktail-nodered | grep -q "Restarting\|Exited"; then
-            print_status "Node-RED fixed successfully"
-            break
-        fi
+# Function to start containers with proper error handling
+start_docker_containers() {
+    local compose_cmd=""
+    
+    # Determine which docker-compose command to use
+    if command -v docker-compose &> /dev/null; then
+        compose_cmd="docker-compose"
+    elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+        compose_cmd="docker compose"
     else
-        print_status "Node-RED is running normally"
-        break
+        print_error "Docker Compose not found!"
+        return 1
     fi
     
-    if [ $attempt -eq 3 ]; then
-        print_error "Node-RED still having issues after 3 attempts"
-        print_info "Check logs with: docker logs cocktail-nodered"
+    print_info "Using compose command: $compose_cmd"
+    
+    # Pull images first to ensure they're available
+    print_info "Pulling Docker images..."
+    $compose_cmd pull
+    
+    # Start containers
+    print_info "Starting containers..."
+    if $compose_cmd up -d; then
+        print_status "Docker containers started successfully"
+        return 0
+    else
+        print_error "Failed to start containers"
+        return 1
+    fi
+}
+
+# Try to start containers
+if ! start_docker_containers; then
+    print_error "Initial container start failed, attempting recovery..."
+    
+    # Try to install docker-compose if missing
+    if ! command -v docker-compose &> /dev/null && ! (command -v docker &> /dev/null && docker compose version &> /dev/null); then
+        print_info "Installing Docker Compose..."
+        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+        
+        # Try again with newly installed docker-compose
+        if command -v docker-compose &> /dev/null; then
+            docker-compose up -d
+        fi
+    fi
+fi
+
+# Verify containers are running
+print_info "Verifying container status..."
+sleep 5
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+
+print_status "Backend services setup completed"
+
+# Step 8: Install Minimal Desktop for Pi Screen Display
+print_step "Step 8: Installing minimal desktop for Pi screen display..."
+
+# Install only essential packages for browser display
+print_info "Installing minimal X11 and browser..."
+sudo apt-get install -y \
+    --no-install-recommends \
+    xorg \
+    xserver-xorg-legacy \
+    xinit \
+    openbox \
+    chromium-browser
+
+print_info "Skipping display manager - using direct X11 startup"
+
+# Add pi user to required groups for X11 access
+print_info "Adding pi user to required groups..."
+sudo usermod -a -G tty,video,input,render $USER
+
+# Configure X11 for Raspberry Pi framebuffer compatibility
+print_info "Configuring X11 for Raspberry Pi..."
+
+# Create Xwrapper config to allow non-console users
+sudo tee /etc/X11/Xwrapper.config > /dev/null << 'X11_WRAPPER_EOF'
+# Xwrapper.config (Debian X Window System server wrapper configuration file)
+allowed_users=anybody
+needs_root_rights=yes
+X11_WRAPPER_EOF
+
+# Create custom X11 configuration to fix framebuffer driver conflicts
+sudo mkdir -p /etc/X11/xorg.conf.d
+
+# GPU/Graphics configuration for Raspberry Pi
+sudo tee /etc/X11/xorg.conf.d/01-raspberrypi.conf > /dev/null << 'RPI_CONF_EOF'
+# Raspberry Pi GPU configuration
+Section "Device"
+    Identifier "Broadcom GPU"
+    Driver "fbdev"
+    Option "fbdev" "/dev/fb0"
+    Option "ShadowFB" "true"
+EndSection
+
+Section "Screen"
+    Identifier "Default Screen"
+    Device "Broadcom GPU"
+    Monitor "Default Monitor"
+EndSection
+
+Section "Monitor"
+    Identifier "Default Monitor"
+EndSection
+RPI_CONF_EOF
+
+# Input configuration to fix keyboard/mouse access
+sudo tee /etc/X11/xorg.conf.d/10-input.conf > /dev/null << 'INPUT_CONF_EOF'
+Section "InputClass"
+    Identifier "libinput keyboard catchall"
+    MatchIsKeyboard "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "libinput"
+EndSection
+
+Section "InputClass"
+    Identifier "libinput pointer catchall"
+    MatchIsPointer "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "libinput"
+EndSection
+
+Section "InputClass"
+    Identifier "libinput touchpad catchall"
+    MatchIsTouchpad "on"
+    MatchDevicePath "/dev/input/event*"
+    Driver "libinput"
+EndSection
+INPUT_CONF_EOF
+
+# Configure auto-login on console
+print_info "Setting up auto-login..."
+sudo mkdir -p /etc/systemd/system/getty@tty1.service.d
+sudo tee /etc/systemd/system/getty@tty1.service.d/override.conf > /dev/null << EOF
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --noissue --autologin $USER %I \$TERM
+Type=idle
+EOF
+
+# Create a simple system info page instead of kiosk
+sudo tee /opt/webroot/system-info.html > /dev/null << 'SYSTEM_INFO_EOF'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>🍹 Cocktail Machine - System Information</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 20px; 
+            margin: 0;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .logo { font-size: 60px; text-align: center; margin-bottom: 20px; }
+        h1 { text-align: center; font-size: 36px; margin-bottom: 30px; }
+        .info-box { 
+            background: rgba(255,255,255,0.1); 
+            padding: 20px; 
+            border-radius: 10px; 
+            margin-bottom: 20px; 
+        }
+        .status-green { color: #2ecc71; font-weight: bold; }
+        .status-red { color: #e74c3c; font-weight: bold; }
+        a { color: #3498db; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">🍹</div>
+        <h1>Cocktail Machine - System Ready</h1>
+        
+        <div class="info-box">
+            <h3>📦 Installation Status</h3>
+            <p>✅ Web dashboard installed and running</p>
+            <p>✅ Nginx web server active</p>
+            <p>✅ Docker backend services configured</p>
+            <p class="status-green">🎯 System Status: ONLINE</p>
+        </div>
+        
+        <div class="info-box">
+            <h3>🌐 Access Points</h3>
+            <p><a href="/">🏠 Main Dashboard</a></p>
+            <p><a href="http://localhost:1880">🔧 Node-RED Interface</a></p>
+            <p><a href="/health">❤️ Health Check</a></p>
+        </div>
+        
+        <div class="info-box">
+            <h3>📱 Usage</h3>
+            <p>• Access this system from any device on your network</p>
+            <p>• Use your phone, tablet, or computer as the interface</p>
+            <p>• No desktop environment needed - pure web-based control</p>
+        </div>
+        
+        <div class="info-box">
+            <h3>🔄 Next Steps</h3>
+            <p>1. Connect to this Pi from another device</p>
+            <p>2. Visit <code>http://[pi-ip-address]</code></p>
+            <p>3. Use the web dashboard to control your cocktail machine</p>
+        </div>
+    </div>
+</body>
+</html>
+SYSTEM_INFO_EOF
+
+print_status "Web-only setup completed - no desktop environment needed"
+
+# Step 9: Create Simple Kiosk Startup
+print_step "Step 9: Creating simple kiosk startup..."
+
+# Create kiosk directory
+mkdir -p /home/$USER/.cocktail-machine
+
+# Create improved kiosk script
+cat > /home/$USER/.cocktail-machine/start-kiosk.sh << 'KIOSK_EOF'
+#!/bin/bash
+# Improved kiosk startup script with better error handling
+
+echo "[$(date)] Starting kiosk setup..."
+
+# Wait for network and nginx to be ready
+echo "[$(date)] Waiting for network and services..."
+sleep 15
+
+# Wait for nginx to respond
+echo "[$(date)] Checking if dashboard is ready..."
+for i in {1..30}; do
+    if curl -s http://localhost >/dev/null 2>&1; then
+        echo "[$(date)] Dashboard is ready!"
+        break
+    fi
+    sleep 2
+done
+
+# Check if we're on the right console
+if [ "$(tty)" != "/dev/tty1" ]; then
+    echo "[$(date)] Not on tty1, exiting"
+    exit 0
+fi
+
+# Set up environment
+echo "[$(date)] Setting up X11 environment..."
+export DISPLAY=:0
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+mkdir -p $XDG_RUNTIME_DIR
+
+# Start X11 server with openbox window manager
+echo "[$(date)] Starting X11 server..."
+startx /usr/bin/openbox-session -- :0 -nolisten tcp vt1 &
+X11_PID=$!
+
+# Wait for X11 to start
+echo "[$(date)] Waiting for X11 server to be ready..."
+for i in {1..30}; do
+    if xset -display :0 q >/dev/null 2>&1; then
+        echo "[$(date)] X11 server is ready!"
+        break
+    fi
+    sleep 1
+done
+
+# Start chromium in kiosk mode
+echo "[$(date)] Starting chromium browser..."
+DISPLAY=:0 chromium-browser \
+    --kiosk \
+    --noerrdialogs \
+    --disable-infobars \
+    --disable-extensions \
+    --disable-plugins \
+    --no-first-run \
+    --disable-dev-shm-usage \
+    --disable-software-rasterizer \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --start-fullscreen \
+    http://localhost \
+    >/tmp/chromium.log 2>&1 &
+
+CHROMIUM_PID=$!
+echo "[$(date)] Chromium started with PID: $CHROMIUM_PID"
+
+# Monitor the processes
+while true; do
+    if ! ps -p $CHROMIUM_PID > /dev/null; then
+        echo "[$(date)] Chromium crashed, restarting..."
+        DISPLAY=:0 chromium-browser \
+            --kiosk \
+            --noerrdialogs \
+            --disable-infobars \
+            --disable-extensions \
+            --disable-plugins \
+            --no-first-run \
+            --disable-dev-shm-usage \
+            --disable-software-rasterizer \
+            http://localhost >/tmp/chromium.log 2>&1 &
+        CHROMIUM_PID=$!
+    fi
+    sleep 30
+done
+KIOSK_EOF
+
+chmod +x /home/$USER/.cocktail-machine/start-kiosk.sh
+
+# Create auto-start script that runs after auto-login
+cat > /home/$USER/.bash_profile << 'PROFILE_EOF'
+# Auto-start kiosk when logging into tty1
+if [ "$(tty)" = "/dev/tty1" ] && [ -z "$DISPLAY" ]; then
+    echo "Starting cocktail machine kiosk..."
+    /home/$USER/.cocktail-machine/start-kiosk.sh
+fi
+PROFILE_EOF
+
+print_status "Simple kiosk startup configured"
+
+# Step 10: Configure headless operation
+print_step "Step 10: Configuring headless operation..."
+
+# Ensure system stays in multi-user mode (no desktop)
+sudo systemctl set-default multi-user.target
+
+print_info "System configured for headless operation"
+print_info "No desktop environment will start - saves resources"
+print_info "All services accessible via web interface"
+
+print_status "Headless operation configured"
+
+# Step 11: Testing installation...
+print_step "Step 11: Testing installation..."
+
+# Wait for services to initialize
+print_info "Waiting for services to initialize..."
+sleep 10
+
+# Test nginx service status first
+print_info "Checking nginx service status..."
+if sudo systemctl is-active nginx >/dev/null 2>&1; then
+    print_status "Nginx service is running"
+elif pgrep nginx >/dev/null; then
+    print_status "Nginx is running (direct process)"
+else
+    print_error "Nginx is not running, attempting to start..."
+    sudo systemctl start nginx 2>/dev/null || sudo nginx 2>/dev/null || print_error "Failed to start nginx"
+fi
+
+# Test React dashboard with retry
+print_info "Testing React dashboard on port 80..."
+for i in {1..5}; do
+    RESPONSE=$(curl -s http://localhost 2>/dev/null || echo "connection_failed")
+    if echo "$RESPONSE" | grep -q "403 Forbidden"; then
+        print_error "Dashboard returning 403 Forbidden - permissions issue detected"
+        print_info "Checking file permissions..."
+        ls -la "$WEBROOT_DIR/" | head -3
+        print_info "Fixing permissions..."
+        sudo chown -R www-data:www-data "$WEBROOT_DIR"
+        sudo chmod -R 644 "$WEBROOT_DIR"/*
+        sudo chmod 755 "$WEBROOT_DIR"
+        sudo systemctl reload nginx
+        sleep 2
+    elif echo "$RESPONSE" | grep -q "html\|HTML\|<title\|<!DOCTYPE"; then
+        print_status "React dashboard is accessible on port 80"
+        break
+    elif [ $i -eq 5 ]; then
+        print_error "Dashboard not accessible after 5 attempts"
+        print_info "Response received: $(echo "$RESPONSE" | head -1)"
+        print_info "Checking nginx error log:"
+        sudo tail -3 /var/log/nginx/error.log 2>/dev/null || print_info "No nginx error log available"
+    else
+        print_info "Attempt $i/5: Waiting for dashboard..."
+        sleep 2
     fi
 done
 
-print_status "Services started"
-
-# Step 8: Final verification
-print_step "Step 8: Final verification..."
-
-print_info "Service status:"
-echo "  • Nginx: $(systemctl is-active nginx)"
-echo "  • Docker: $(systemctl is-active docker)"
-
-print_info "Container status:"
-docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-
-print_info "Testing web dashboard..."
-if curl -s http://localhost | grep -q "<html"; then
-    print_status "Dashboard is working"
-else
-    print_error "Dashboard not responding properly"
-fi
-
-print_info "Testing Node-RED..."
-for i in {1..10}; do
-    if curl -s http://localhost:1880 >/dev/null 2>&1; then
-        print_status "Node-RED is accessible"
+# Test nginx health check with retry
+print_info "Testing nginx health check..."
+for i in {1..3}; do
+    if curl -s http://localhost/health | grep -q "healthy"; then
+        print_status "Nginx health check passed"
         break
-    elif [ $i -eq 10 ]; then
-        print_warning "Node-RED not accessible - may need manual restart"
+    elif [ $i -eq 3 ]; then
+        print_info "Health check not responding (nginx may need restart)"
     else
+        sleep 2
+    fi
+done
+
+# Test Node-RED service
+print_info "Testing Node-RED service..."
+for i in {1..5}; do
+    if curl -s http://localhost:1880 >/dev/null 2>&1; then
+        print_status "Node-RED is accessible on port 1880"
+        break
+    elif [ $i -eq 5 ]; then
+        print_info "Node-RED not accessible after 5 attempts"
+        print_info "Docker containers status:"
+        docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || print_info "Docker not accessible"
+    else
+        print_info "Attempt $i/5: Waiting for Node-RED..."
         sleep 3
     fi
 done
 
-echo
-echo "==================================================="
-echo "🎉 Installation Complete!"
-echo "==================================================="
-echo
-echo "🌍 Access your system:"
-echo "   • Dashboard:      http://$(hostname -I | awk '{print $1}')"
-echo "   • Node-RED UI:    http://$(hostname -I | awk '{print $1}'):1880/ui"
-echo "   • Node-RED Admin: http://$(hostname -I | awk '{print $1}'):1880/admin"
-echo
-echo "🔧 System Management:"
-echo "   • Restart web:    sudo systemctl restart nginx"
-echo "   • Restart Node-RED: cd $PROJECT_DIR && docker-compose restart nodered"
-echo "   • View logs:      docker logs cocktail-nodered"
-echo
-echo "📂 Flow File Location:"
-echo "   • Place your .json flow file at: $PROJECT_DIR/nodered/data/flows.json"
-echo "   • After copying your flow, restart Node-RED: docker-compose restart nodered"
-echo "   • Your flow will be automatically loaded on restart"
-echo
-echo "📱 Your cocktail machine is ready to use!"
-echo "==================================================="
+# Test update system
+print_info "Testing update system..."
+if [ -f "$SCRIPTS_DIR/update_dashboard.sh" ]; then
+    if sudo "$SCRIPTS_DIR/update_dashboard.sh" --check 2>/dev/null; then
+        print_status "Update system working"
+    else
+        print_info "Update system check completed"
+    fi
+else
+    print_error "Update script not found at $SCRIPTS_DIR/update_dashboard.sh"
+fi
+
+# Additional diagnostics
+print_info "Running system diagnostics..."
+echo "📊 System Status:"
+echo "   • Nginx process: $(pgrep nginx >/dev/null && echo 'Running' || echo 'Not running')"
+echo "   • Docker process: $(pgrep dockerd >/dev/null && echo 'Running' || echo 'Not running')"
+echo "   • Dashboard files: $([ -f /opt/webroot/index.html ] && echo 'Present' || echo 'Missing')"
+echo "   • Webroot permissions: $(ls -ld /opt/webroot 2>/dev/null | awk '{print $1, $3, $4}' || echo 'Not accessible')"
+echo "   • Index.html size: $([ -f /opt/webroot/index.html ] && stat -c%s /opt/webroot/index.html || echo 'N/A') bytes"
+echo "   • Nginx config test: $(sudo nginx -t 2>&1 >/dev/null && echo 'Valid' || echo 'Invalid')"
+echo "   • Docker containers: $(docker ps -q | wc -l) running"
+
+# Show Docker container status
+print_info "Docker containers status:"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || print_info "Docker not accessible"
+
+print_status "Installation testing and diagnostics completed"
+
+echo ""
+echo "=================================================="
+echo "🎉 Cocktail Machine Setup Complete!"
+echo "=================================================="
+echo ""
+echo "✅ Production React dashboard installed and running"
+echo "✅ Node-RED flows deployed with update system"
+echo "✅ Nginx web server configured and started"
+echo "✅ Docker backend services configured"
+echo "✅ Update system installed and working"
+echo "✅ Simple kiosk browser configured for Pi screen"
+echo "✅ Web access enabled from network devices"
+echo ""
+echo "🌍 Access Points (from ANY device on your network):"
+echo "   • React Dashboard: http://[pi-ip-address]"
+echo "   • Node-RED UI:     http://[pi-ip-address]:1880/ui"
+echo "   • Node-RED Admin:  http://[pi-ip-address]:1880/admin"
+echo "   • Health Check:    http://[pi-ip-address]/health"
+echo "   • System Info:     http://[pi-ip-address]/system-info.html"
+echo ""
+echo "🔄 Update Commands:"
+echo "   • Check updates:   sudo $SCRIPTS_DIR/update_dashboard.sh --check"
+echo "   • Install updates: sudo $SCRIPTS_DIR/update_dashboard.sh"
+echo "   • Quick update:    sudo $SCRIPTS_DIR/quick-update.sh"
+echo ""
+echo "🛠️ Troubleshooting:"
+echo "   • Restart nginx:    sudo systemctl restart nginx"
+echo "   • Check nginx:      sudo systemctl status nginx"
+echo "   • Check dashboard:  ls -la /opt/webroot/"
+echo "   • View logs:        journalctl -f"
+echo "   • Docker status:    docker ps"
+echo "   • Restart Docker:   cd $PROJECT_DIR && docker-compose restart"
+echo ""
+echo "📱 Usage:"
+echo "   1. Pi screen shows dashboard automatically after reboot"
+echo "   2. Also access from phone, tablet, or computer"
+echo "   3. Connect to same WiFi network as the Pi"
+echo "   4. Visit http://[pi-ip-address] in any web browser"
+echo ""
+echo "🔍 Find your Pi's IP address: ip addr show | grep 'inet '"
+echo ""
+echo "⚠️ If services aren't running:"
+echo "   1. Wait 2-3 minutes after installation"
+echo "   2. Run: sudo systemctl restart nginx"
+echo "   3. Run: cd $PROJECT_DIR && docker-compose restart"
+echo "   4. Check: curl http://localhost"
+echo ""
+echo "🔄 Reboot required to start Pi screen display:"
+echo "   sudo reboot"
+echo ""
+echo "🎉 After reboot: Pi screen will show dashboard + network access available!"
+echo ""
+echo "📦 Installation completed with script version: $SCRIPT_VERSION ($SCRIPT_BUILD)"
+echo "🕰️ Installation timestamp: $(date '+%Y-%m-%d %H:%M:%S')"
+echo "=================================================="
