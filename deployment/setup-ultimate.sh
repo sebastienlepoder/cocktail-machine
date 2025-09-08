@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.9"
-SCRIPT_BUILD="Build-767"
+SCRIPT_VERSION="2025.09.07-v1.0.10"
+SCRIPT_BUILD="Build-827"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
@@ -823,6 +823,108 @@ else
 fi
 
 print_status "Backend services startup attempted"
+
+# Fix Node-RED restart loop if container is restarting
+print_step "7.6: Checking and fixing Node-RED container issues"
+print_info "Waiting for containers to initialize..."
+sleep 15
+
+print_info "Checking Node-RED container status..."
+if docker ps -a | grep cocktail-nodered | grep -q "Restarting"; then
+    print_warning "Node-RED container is restarting - fixing configuration..."
+    
+    print_info "Stopping containers for Node-RED fix..."
+    cd "$PROJECT_DIR"
+    if command -v docker-compose &> /dev/null; then
+        docker-compose stop nodered 2>/dev/null || true
+    elif docker compose version &> /dev/null; then
+        docker compose stop nodered 2>/dev/null || true
+    fi
+    docker stop cocktail-nodered 2>/dev/null || true
+    
+    print_info "Checking Node-RED logs for errors..."
+    docker logs cocktail-nodered --tail 10 2>/dev/null || print_info "Cannot access container logs"
+    
+    print_info "Fixing Node-RED data directory permissions..."
+    sudo chown -R 1000:1000 "$PROJECT_DIR/nodered/data"
+    chmod -R 755 "$PROJECT_DIR/nodered/data"
+    
+    print_info "Updating Docker Compose configuration for Node-RED stability..."
+    # Update the docker-compose.yml to include explicit user and improved command
+    cat > "$PROJECT_DIR/docker-compose.yml" << 'IMPROVED_DOCKER_EOF'
+version: '3.8'
+
+services:
+  # Node-RED for automation
+  nodered:
+    image: nodered/node-red:latest
+    container_name: cocktail-nodered
+    restart: unless-stopped
+    ports:
+      - "1880:1880"
+    volumes:
+      - ./nodered/data:/data
+    environment:
+      - TZ=Europe/Paris
+      - NODE_RED_ENABLE_PROJECTS=false
+      - NODE_RED_ENABLE_SAFE_MODE=false
+    networks:
+      - cocktail-network
+    user: "1000:1000"
+    command: ["node-red", "--userDir", "/data", "--settings", "/data/settings.js"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:1880"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # MQTT Broker
+  mqtt:
+    image: eclipse-mosquitto:latest
+    container_name: cocktail-mqtt
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - cocktail-network
+
+networks:
+  cocktail-network:
+    driver: bridge
+IMPROVED_DOCKER_EOF
+    
+    print_info "Restarting containers with improved configuration..."
+    if command -v docker-compose &> /dev/null; then
+        docker-compose up -d
+    elif docker compose version &> /dev/null; then
+        docker compose up -d
+    fi
+    
+    print_info "Waiting for Node-RED to start with new configuration..."
+    sleep 20
+fi
+
+print_info "Final container status check..."
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || print_info "Cannot check container status"
+
+print_info "Testing Node-RED accessibility..."
+for i in {1..5}; do
+    if curl -s http://localhost:1880 >/dev/null 2>&1; then
+        print_status "Node-RED is accessible on port 1880"
+        break
+    elif [ $i -eq 5 ]; then
+        print_warning "Node-RED not accessible after 5 attempts - may need manual restart"
+        print_info "Try: cd $PROJECT_DIR && docker-compose restart nodered"
+    else
+        sleep 3
+    fi
+done
 
 # Step 8: Install Minimal Desktop for Pi Screen Display
 print_step "Step 8: Installing minimal desktop for Pi screen display..."
