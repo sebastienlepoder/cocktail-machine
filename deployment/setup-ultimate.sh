@@ -4,8 +4,8 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.14"
-SCRIPT_BUILD="Build-006-Fixed"
+SCRIPT_VERSION="2025.09.07-v1.0.15"
+SCRIPT_BUILD="Build-015"
 
 echo "=================================================="
 echo "🍹 Cocktail Machine - Production Setup"
