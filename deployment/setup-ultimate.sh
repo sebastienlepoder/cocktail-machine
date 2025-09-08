@@ -4,7 +4,7 @@
 # Version: 2025.09.07-v1.0.0
 # Downloads React dashboard and serves it via nginx
 
-SCRIPT_VERSION="2025.09.07-v1.0.13"
+SCRIPT_VERSION="2025.09.07-v1.0.14"
 SCRIPT_BUILD="Build-006-Fixed"
 
 echo "=================================================="
@@ -617,16 +617,25 @@ fi
 
 # Download Node-RED settings
 print_info "Fetching Node-RED settings..."
-if curl -L -f -o "$PROJECT_DIR/nodered/data/settings.js" "$NODERED_URL/settings/settings.js"; then
-    print_status "Node-RED settings downloaded successfully"
+if curl -L -f -o "$PROJECT_DIR/nodered/data/settings.js" "$NODERED_URL/settings/settings.js" 2>/dev/null; then
+    print_info "Node-RED settings downloaded, validating..."
+    
+    # Check if the downloaded settings has the problematic 'memoryOnly' context store
+    if grep -q "memoryOnly" "$PROJECT_DIR/nodered/data/settings.js"; then
+        print_info "Fixing invalid context store configuration in settings.js..."
+        sed -i "s/'memoryOnly'/'memory'/g" "$PROJECT_DIR/nodered/data/settings.js"
+        sed -i 's/"memoryOnly"/"memory"/g' "$PROJECT_DIR/nodered/data/settings.js"
+        print_status "Fixed context store configuration"
+    fi
+    print_status "Node-RED settings ready"
 else
     print_info "Creating default Node-RED settings"
-    # Create basic settings file
+    # Create basic settings file with correct context store
     cat > "$PROJECT_DIR/nodered/data/settings.js" << 'SETTINGS_EOF'
 module.exports = {
     uiPort: process.env.PORT || 1880,
     uiHost: '0.0.0.0',
-    httpAdminRoot: '/admin',
+    httpAdminRoot: '/',
     httpNodeRoot: '/api',
     userDir: '/data',
     flowFile: 'flows.json',
@@ -634,10 +643,15 @@ module.exports = {
     editorTheme: {
         page: {
             title: "Cocktail Machine - Node-RED",
-            favicon: "🍹"
+            favicon: "/icons/node-red-icon.svg"
         },
         header: {
             title: "🍹 Cocktail Machine Control"
+        }
+    },
+    contextStorage: {
+        default: {
+            module: "memory"
         }
     },
     logging: {
@@ -646,7 +660,8 @@ module.exports = {
             metrics: false,
             audit: false
         }
-    }
+    },
+    functionGlobalContext: {}
 };
 SETTINGS_EOF
     print_status "Default Node-RED settings created"
