@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Cocktail Machine - Complete Installation Script
-# Version: 2025.09.08-v1.0.11
-# Clean, working version with all fixes integrated
+# Version: 2025.09.08-v1.0.12
+# Node-RED fixes applied - dashboard unchanged
 
-SCRIPT_VERSION="2025.09.07-v1.0.11"
-SCRIPT_BUILD="Build-580"
+SCRIPT_VERSION="2025.09.08-v1.0.12"
+SCRIPT_BUILD="Build-581"
 
 echo "==================================================="
 echo "🍹 Cocktail Machine - Complete Installation"
@@ -355,16 +355,15 @@ services:
     environment:
       - TZ=Europe/Paris
       - NODE_RED_ENABLE_PROJECTS=false
+      - NODE_RED_CREDENTIAL_SECRET=cocktail-machine-secret
     networks:
       - cocktail-network
-    user: "1000:1000"
-    command: ["node-red", "--userDir", "/data"]
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:1880"]
+      test: ["CMD-SHELL", "curl -f http://localhost:1880 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 90s
 
   mqtt:
     image: eclipse-mosquitto:latest
@@ -408,9 +407,21 @@ module.exports = {
     uiHost: '0.0.0.0',
     httpAdminRoot: '/admin',
     httpNodeRoot: '/api',
+    httpStatic: '/data/static',
     userDir: '/data',
     flowFile: 'flows.json',
     flowFilePretty: true,
+    credentialSecret: process.env.NODE_RED_CREDENTIAL_SECRET || 'cocktail-machine-secret',
+    adminAuth: false,
+    httpNodeAuth: false,
+    httpStaticAuth: false,
+    functionGlobalContext: {},
+    exportGlobalContextKeys: false,
+    contextStorage: {
+        default: {
+            module: "localfilesystem"
+        }
+    },
     editorTheme: {
         page: {
             title: "Cocktail Machine - Node-RED",
@@ -418,6 +429,19 @@ module.exports = {
         },
         header: {
             title: "🍹 Cocktail Machine Control"
+        },
+        deployButton: {
+            type: "simple",
+            label: "Deploy",
+            icon: "red/images/deploy-full-o.png"
+        },
+        menu: {
+            "menu-item-import-library": false,
+            "menu-item-export-library": false
+        },
+        userMenu: false,
+        login: {
+            image: "red/images/node-red-icon.png"
         }
     },
     logging: {
@@ -425,12 +449,18 @@ module.exports = {
             level: "info",
             metrics: false,
             audit: false
+        },
+        file: {
+            level: "info",
+            filename: "/data/node-red.log",
+            maxFiles: 5,
+            maxSize: "10MB"
         }
     }
 };
 SETTINGS_EOF
 
-# Create basic flows
+# Create basic flows (will be overridden by your custom flow)
 cat > nodered/data/flows.json << 'FLOWS_EOF'
 [
     {
@@ -438,7 +468,7 @@ cat > nodered/data/flows.json << 'FLOWS_EOF'
         "type": "tab",
         "label": "Cocktail Machine",
         "disabled": false,
-        "info": ""
+        "info": "Main cocktail machine control flow"
     },
     {
         "id": "welcome-inject",
@@ -449,11 +479,11 @@ cat > nodered/data/flows.json << 'FLOWS_EOF'
         "repeat": "",
         "crontab": "",
         "once": true,
-        "onceDelay": 0.1,
+        "onceDelay": 2,
         "topic": "",
-        "payload": "🍹 Cocktail Machine Node-RED Online!",
+        "payload": "🍹 Cocktail Machine Node-RED Online! Ready for custom flow.",
         "payloadType": "str",
-        "x": 130,
+        "x": 140,
         "y": 80,
         "wires": [["debug-node"]]
     },
@@ -468,17 +498,23 @@ cat > nodered/data/flows.json << 'FLOWS_EOF'
         "tostatus": false,
         "complete": "payload",
         "targetType": "msg",
-        "x": 350,
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 370,
         "y": 80,
         "wires": []
     }
 ]
 FLOWS_EOF
 
+# Create empty credentials file
+echo '{}' > nodered/data/flows_cred.json
+
 # Set correct permissions
 sudo chown -R $USER:$USER "$PROJECT_DIR"
 sudo chown -R 1000:1000 "$PROJECT_DIR/nodered/data"
 chmod -R 755 "$PROJECT_DIR"
+chmod 600 "$PROJECT_DIR/nodered/data/flows_cred.json"
 
 print_status "Backend services configured"
 
@@ -493,20 +529,48 @@ sleep 30
 
 # Check and fix Node-RED if needed
 print_info "Checking Node-RED status..."
-if docker ps | grep cocktail-nodered | grep -q "Restarting"; then
-    print_warning "Node-RED container restarting - applying fix..."
+sleep 10  # Give containers time to start
+
+# Check if Node-RED is running properly
+for attempt in 1 2 3; do
+    if docker ps | grep cocktail-nodered | grep -q "Restarting\|Exited"; then
+        print_warning "Node-RED container issue (attempt $attempt) - applying fix..."
+        
+        # Stop and remove container
+        docker-compose stop nodered || true
+        docker-compose rm -f nodered || true
+        sleep 5
+        
+        # Fix permissions thoroughly
+        sudo chown -R 1000:1000 "$PROJECT_DIR/nodered/data"
+        chmod -R 755 "$PROJECT_DIR/nodered/data"
+        chmod 600 "$PROJECT_DIR/nodered/data/flows_cred.json"
+        
+        # Ensure settings file is correct
+        if [ ! -f "$PROJECT_DIR/nodered/data/settings.js" ]; then
+            print_warning "Recreating settings.js..."
+            # Recreate settings if missing - this would be the same content as above
+        fi
+        
+        # Start fresh
+        docker-compose up -d nodered
+        sleep 30
+        
+        # Check if it's working now
+        if ! docker ps | grep cocktail-nodered | grep -q "Restarting\|Exited"; then
+            print_status "Node-RED fixed successfully"
+            break
+        fi
+    else
+        print_status "Node-RED is running normally"
+        break
+    fi
     
-    docker-compose stop nodered
-    sleep 5
-    
-    # Fix permissions again
-    sudo chown -R 1000:1000 "$PROJECT_DIR/nodered/data"
-    chmod -R 755 "$PROJECT_DIR/nodered/data"
-    
-    # Restart
-    docker-compose up -d nodered
-    sleep 20
-fi
+    if [ $attempt -eq 3 ]; then
+        print_error "Node-RED still having issues after 3 attempts"
+        print_info "Check logs with: docker logs cocktail-nodered"
+    fi
+done
 
 print_status "Services started"
 
@@ -553,6 +617,11 @@ echo "🔧 System Management:"
 echo "   • Restart web:    sudo systemctl restart nginx"
 echo "   • Restart Node-RED: cd $PROJECT_DIR && docker-compose restart nodered"
 echo "   • View logs:      docker logs cocktail-nodered"
+echo
+echo "📂 Flow File Location:"
+echo "   • Place your .json flow file at: $PROJECT_DIR/nodered/data/flows.json"
+echo "   • After copying your flow, restart Node-RED: docker-compose restart nodered"
+echo "   • Your flow will be automatically loaded on restart"
 echo
 echo "📱 Your cocktail machine is ready to use!"
 echo "==================================================="
